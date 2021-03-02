@@ -61,6 +61,11 @@ import org.tensorflow.lite.Interpreter;
 import org.tensorflow.lite.gpu.CompatibilityList;
 import org.tensorflow.lite.gpu.GpuDelegate;
 import org.tensorflow.lite.support.common.FileUtil;
+import org.tensorflow.lite.support.common.ops.NormalizeOp;
+import org.tensorflow.lite.support.image.ImageOperator;
+import org.tensorflow.lite.support.image.ImageProcessor;
+import org.tensorflow.lite.support.image.TensorImage;
+import org.tensorflow.lite.support.image.ops.ResizeWithCropOrPadOp;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -358,19 +363,27 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       if (cont > 4){
         image = frame.acquireCameraImage();
         Bitmap imageBitmap = ImageUtilsKt.yuvToBitmap(image);
-        Bitmap resizedBitmap = Bitmap.createScaledBitmap(imageBitmap, 640, 384, true);
 
-        ByteBuffer modelInput = ByteBuffer.allocate(640*384*3* DataType.FLOAT32.byteSize());
-        //modelInput.order(ByteOrder.nativeOrder());
-        resizedBitmap.copyPixelsToBuffer(modelInput);
-        modelInput.rewind();
+        ByteBuffer modelInput;
 
-        // Per visualizzare se stiamo convertendo correttamente l'input
+        ImageProcessor imageProcessor =
+                new ImageProcessor.Builder().add(new ResizeWithCropOrPadOp(384, 640))
+                                            .add(new NormalizeOp(0,255))
+                                            .build();
+
+        TensorImage tensorImage = new TensorImage();
+        tensorImage.load(imageBitmap);
+
+        TensorImage normalizedTensorImage = imageProcessor.process(tensorImage);
+        modelInput = normalizedTensorImage.getBuffer();
+
         /*
+        // Per visualizzare se stiamo convertendo correttamente l'input
+
         Bitmap temp = Bitmap.createBitmap(640, 384, Bitmap.Config.ARGB_8888);
         temp.copyPixelsFromBuffer(modelInput);
         modelInput.rewind();
-        */
+*/
 
 
         ByteBuffer inference = model.doInference(modelInput);
