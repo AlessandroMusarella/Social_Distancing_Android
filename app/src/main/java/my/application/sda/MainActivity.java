@@ -22,7 +22,9 @@ import android.media.Image;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Log;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -136,6 +138,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   // Variables for PyDNet model
   private MLModel model;
 
+  // Variables for count fps
+  private TextView fpsShow;
+  long currentFrameTime = 0;
+  long previousFrameTime = 0;
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
@@ -153,6 +160,8 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     } catch (IOException e) {
       e.printStackTrace();
     }
+    fpsShow = (TextView)findViewById(R.id.FPS_show);
+    currentFrameTime = SystemClock.elapsedRealtime();
 
     installRequested = false;
   }
@@ -343,6 +352,10 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     // Notify ARCore session that the view size changed so that the perspective matrix and
     // the video background can be properly adjusted.
     displayRotationHelper.updateSessionIfNeeded(session);
+
+    previousFrameTime = currentFrameTime;
+    currentFrameTime = SystemClock.elapsedRealtime();
+    fpsShow.setText("" + (int)1000.0/(currentFrameTime - previousFrameTime));
 
     // Obtain the current frame from ARSession. When the configuration is set to
     // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
