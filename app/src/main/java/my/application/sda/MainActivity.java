@@ -55,6 +55,7 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
+import my.application.sda.calibrator.Calibrator;
 import my.application.sda.helpers.ImageUtilsKt;
 import my.application.sda.model.MLModel;
 
@@ -373,7 +374,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     //PyDNet Inference
     Image image = null;
     try {
-      if (cont > 4){
+      if (cont > 120){
         image = frame.acquireCameraImage();
         Bitmap imageBitmap = ImageUtilsKt.yuvToBitmap(image);
 
@@ -420,6 +421,21 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
         inference.rewind();
 
+        // Calibrate depth map
+        PointCloud pointCloud = frame.acquirePointCloud();
+
+        double scaleX = 640. / this.surfaceView.getWidth();
+        double scaleY = 384. / this.surfaceView.getHeight();
+        Calibrator calibrator = new Calibrator(this.surfaceView.getWidth(), this.surfaceView.getHeight(), scaleX, scaleY,100, 0.1,0.33);
+
+        frame.getCamera().getProjectionMatrix(projectionMatrix, 0, 0.05f, 100f);
+        frame.getCamera().getViewMatrix(viewMatrix, 0);
+        calibrator.setCalibrator(frame.getCamera().getPose(), projectionMatrix , viewMatrix);
+        calibrator.calibrate(normalizedOutput, pointCloud);
+        double scaleFactor = calibrator.getScaleFactor();
+        double shiftFactor = calibrator.getShiftFactor();
+
+        pointCloud.close();
         image.close();
      }else{
         cont++;
