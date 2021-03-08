@@ -57,26 +57,16 @@ import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationExceptio
 
 import my.application.sda.calibrator.Calibrator;
 import my.application.sda.helpers.ImageUtilsKt;
-import my.application.sda.model.MLModel;
+import my.application.sda.model.TFLiteDepthModel;
 
-import org.tensorflow.lite.DataType;
-import org.tensorflow.lite.Interpreter;
-import org.tensorflow.lite.gpu.CompatibilityList;
-import org.tensorflow.lite.gpu.GpuDelegate;
-import org.tensorflow.lite.support.common.FileUtil;
 import org.tensorflow.lite.support.common.ops.NormalizeOp;
-import org.tensorflow.lite.support.image.ImageOperator;
 import org.tensorflow.lite.support.image.ImageProcessor;
 import org.tensorflow.lite.support.image.TensorImage;
 import org.tensorflow.lite.support.image.ops.ResizeWithCropOrPadOp;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
-import java.nio.MappedByteBuffer;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * This is a simple example that shows how to create an augmented reality (AR) application using the
@@ -137,12 +127,17 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private int cont = 0;
 
   // Variables for PyDNet model
-  private MLModel model;
+  private TFLiteDepthModel model;
 
   // Variables for count fps
   private TextView fpsShow;
   long currentFrameTime = 0;
   long previousFrameTime = 0;
+
+  // temp
+  TempClass tempClass;
+
+  protected PointCloud pointCloud;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -155,7 +150,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     render = new SampleRender(surfaceView, this, getAssets());
 
     // Set up PyDNet model and interpreter
-    model = new MLModel("tflite_pydnet.tflite");
+    model = new TFLiteDepthModel("tflite_pydnet.tflite");
     try {
       model.init(this.getApplicationContext());
     } catch (IOException e) {
@@ -341,6 +336,21 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       return;
     }
 
+    // Update the current fps
+    previousFrameTime = currentFrameTime;
+    currentFrameTime = SystemClock.elapsedRealtime();
+    fpsShow.setText("" + (int)1000.0/(currentFrameTime - previousFrameTime));
+
+    /*  pseudocodice di come sarà
+    if(!isProcessingFrame){
+      image = frame.image
+      output = MegaElaborator3000(image)
+    }
+    */
+
+
+    // -- Manage ARCore Session
+
     // Texture names should only be set once on a GL thread unless they change. This is done during
     // onDrawFrame rather than onSurfaceCreated since the session is not guaranteed to have been
     // initialized during the execution of onSurfaceCreated.
@@ -353,10 +363,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     // Notify ARCore session that the view size changed so that the perspective matrix and
     // the video background can be properly adjusted.
     displayRotationHelper.updateSessionIfNeeded(session);
-
-    previousFrameTime = currentFrameTime;
-    currentFrameTime = SystemClock.elapsedRealtime();
-    fpsShow.setText("" + (int)1000.0/(currentFrameTime - previousFrameTime));
 
     // Obtain the current frame from ARSession. When the configuration is set to
     // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
@@ -371,85 +377,34 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     }
     Camera camera = frame.getCamera();
 
-    //PyDNet Inference
-    Image image = null;
-    try {
-      if (cont > 120){
-        image = frame.acquireCameraImage();
-        Bitmap imageBitmap = ImageUtilsKt.yuvToBitmap(image);
-
-        ByteBuffer modelInput;
-
-        ImageProcessor imageProcessor =
-                new ImageProcessor.Builder().add(new ResizeWithCropOrPadOp(384, 640))
-                                            .add(new NormalizeOp(0,255))
-                                            .build();
-
-        TensorImage tensorImage = new TensorImage();
-        tensorImage.load(imageBitmap);
-
-        TensorImage normalizedTensorImage = imageProcessor.process(tensorImage);
-        modelInput = normalizedTensorImage.getBuffer();
-
-        /*
-        // Per visualizzare se stiamo convertendo correttamente l'input
-
-        Bitmap temp = Bitmap.createBitmap(640, 384, Bitmap.Config.ARGB_8888);
-        temp.copyPixelsFromBuffer(modelInput);
-        modelInput.rewind();
-*/
-
-
-        ByteBuffer inference = model.doInference(modelInput);
-
-
-        FloatBuffer floatOutput = inference.asFloatBuffer();
-        FloatBuffer normalizedOutput = normalizeOutput(floatOutput);
-
-        // Per visualizzare se l'output è corretto
-
-        Bitmap argbOutputBitmap = Bitmap.createBitmap(640, 384, Bitmap.Config.ARGB_8888);
-        for(int x=0; x<640; x++){
-          for(int y=0; y<384; y++){
-            float depth = normalizedOutput.get(640*y + x);
-            int pixel = (int) (depth*255);
-            floatOutput.rewind();
-            int color = Color.rgb(pixel, pixel, pixel);
-            argbOutputBitmap.setPixel(x,y,color);
-          }
-        }
-
-        inference.rewind();
-
-        // Calibrate depth map
-        PointCloud pointCloud = frame.acquirePointCloud();
-
-        double scaleX = 640. / this.surfaceView.getWidth();
-        double scaleY = 384. / this.surfaceView.getHeight();
-        Calibrator calibrator = new Calibrator(this.surfaceView.getWidth(), this.surfaceView.getHeight(), scaleX, scaleY,100, 0.1,0.33);
-
-        frame.getCamera().getProjectionMatrix(projectionMatrix, 0, 0.05f, 100f);
-        frame.getCamera().getViewMatrix(viewMatrix, 0);
-        calibrator.setCalibrator(frame.getCamera().getPose(), projectionMatrix , viewMatrix);
-        calibrator.calibrate(normalizedOutput, pointCloud);
-        double scaleFactor = calibrator.getScaleFactor();
-        double shiftFactor = calibrator.getShiftFactor();
-
-        pointCloud.close();
-        image.close();
-     }else{
-        cont++;
-     }
-    } catch (NotYetAvailableException e) {
-      e.printStackTrace();
-    }
-
     // BackgroundRenderer.updateDisplayGeometry must be called every frame to update the coordinates
     // used to draw the background camera image.
     backgroundRenderer.updateDisplayGeometry(frame);
 
     // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
     trackingStateHelper.updateKeepScreenOnFlag(camera.getTrackingState());
+
+
+    // -- Elaboration
+    //PyDNet Inference and calibration
+
+    try (PointCloud pointCloud = frame.acquirePointCloud()) {   // da modificare!!!!!!!!
+    if (cont > 120){
+      if(tempClass == null){
+        tempClass = new TempClass(this.getApplicationContext(), this.surfaceView.getWidth(), this.surfaceView.getHeight());
+      }
+
+      //pointCloud = frame.acquirePointCloud();
+      tempClass.doInference(frame, pointCloud);
+      //pointCloud.release();
+
+
+      //People detection
+
+
+    }else{
+      cont++;
+    }
 
 
     // -- Draw background
@@ -460,11 +415,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       backgroundRenderer.drawBackground(render);
     }
 
-
     // If not tracking, don't draw 3D objects.
     if (camera.getTrackingState() == TrackingState.PAUSED) {
       return;
     }
+
 
     // -- Draw non-occluded virtual objects (planes, point cloud)
 
@@ -476,7 +431,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     // Visualize tracked points.
     // Use try-with-resources to automatically release the point cloud.
-    try (PointCloud pointCloud = frame.acquirePointCloud()) {
       if (pointCloud.getTimestamp() > lastPointCloudTimestamp) {
         pointCloudVertexBuffer.set(pointCloud.getPoints());
         lastPointCloudTimestamp = pointCloud.getTimestamp();
@@ -490,31 +444,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     //backgroundRenderer.drawVirtualScene(render, virtualSceneFramebuffer, Z_NEAR, Z_FAR);
   }
 
-
-  private FloatBuffer normalizeOutput(FloatBuffer modelOutput) {
-    FloatBuffer result = FloatBuffer.allocate(modelOutput.remaining());
-
-    float max = Float.MIN_VALUE;
-    float min = Float.MAX_VALUE;
-
-    while(modelOutput.hasRemaining()){
-      float depth = modelOutput.get();
-      if(depth > max)
-        max = depth;
-      else if(depth < min)
-        min = depth;
-    }
-
-    modelOutput.rewind();
-
-    while(modelOutput.hasRemaining()){
-      float depth = modelOutput.get();
-      float normalizedDepth = (depth - min) / (max - min);
-      result.put(normalizedDepth);
-    }
-
-    return result;
-  }
 
 
   /** Configures the session with feature settings. */

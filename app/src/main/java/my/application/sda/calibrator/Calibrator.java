@@ -12,6 +12,8 @@ import java.util.Random;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import my.application.sda.helpers.CoordsUtils;
+
 class RansacIntelObject{
     public double groundTruth;
     public double prediction;
@@ -31,8 +33,9 @@ public class Calibrator {
     private Pose camera;
     private float[] projectionMatrix;
     private float[] viewMatrix;
-    private int width;
-    private int height;
+    private int viewWidth;
+    private int viewHeight;
+    private int depthWidth;
     private double scaleX;
     private double scaleY;
 
@@ -42,11 +45,12 @@ public class Calibrator {
     private double percentagePossibleInlier;
     private Random rnd = new Random();
 
-    public Calibrator(int width, int height, double scaleX, double scaleY, int numberOfIterations, double normalizedThreshold, double percentagePossibleInlier) {
-        this.width = width;
-        this.height = height;
-        this.scaleX = scaleX;
-        this.scaleY = scaleY;
+    public Calibrator(int viewWidth, int viewHeight, int depthWidth, int depthHeight, int numberOfIterations, double normalizedThreshold, double percentagePossibleInlier) {
+        this.viewWidth = viewWidth;
+        this.viewHeight = viewHeight;
+        this.depthWidth = depthWidth;
+        this.scaleX = (double) depthWidth / (double) viewWidth;
+        this.scaleY = (double) depthHeight / (double) viewHeight;
         this.numberOfIterations = numberOfIterations;
         this.normalizedThreshold = normalizedThreshold;
         this.percentagePossibleInlier = percentagePossibleInlier;
@@ -70,6 +74,7 @@ public class Calibrator {
     public void calibrate(FloatBuffer prediction, PointCloud pointCloud){       // i punti sono da rilasciare alla fine con release???
 
         FloatBuffer points = pointCloud.getPoints();
+        points.rewind();
         int numPoints = points.remaining() / 4;
         float[] point = new float[4];
         RansacIntelObject[] ransacIntelObjects = new RansacIntelObject[numPoints];
@@ -82,10 +87,10 @@ public class Calibrator {
             point[3] = points.get();    //confidence
 
             // Unproject point to screen
-            Point screenPoint = worldToScreen(point, width, height, projectionMatrix, viewMatrix);
+            Point screenPoint = CoordsUtils.worldToScreen(point, viewWidth, viewHeight, projectionMatrix, viewMatrix);
 
             // Clipping point outside screen
-            if(screenPoint.x >= width || screenPoint.y > height || screenPoint.x < 0 || screenPoint.y < 0) {
+            if(screenPoint.x >= viewWidth || screenPoint.y > viewHeight || screenPoint.x < 0 || screenPoint.y < 0) {
                 continue;
             }
 
@@ -93,13 +98,14 @@ public class Calibrator {
             double distance = distanceTo(point, camera.getTranslation());
 
             // Transform screen coordinates relative to the image depth
-            Point coordML = getCoordsML(screenPoint, scaleX, scaleY);
+            Point coordML = CoordsUtils.getCoordsML(screenPoint, scaleX, scaleY);
 
             // Calculate depth with neural network
             float predictedDistance = getPredictionFromPoint(prediction, coordML);
 
             ransacIntelObjects[numValidPoint++] = new RansacIntelObject(1/distance, predictedDistance);     // 1/distance se è disparità
         }
+        points.rewind();
 
         // Need at least one element
         if(numValidPoint < 1){
@@ -281,33 +287,10 @@ public class Calibrator {
         return Math.sqrt(Math.pow(point[0] - camera[0], 2) + Math.pow(point[1] - camera[1], 2) + Math.pow(point[2] - camera[2], 2));
     }
 
-    // Transform the screen coordinates into the depth image coordinate
-    private Point getCoordsML(Point screenPoint, double scaleX, double scaleY) {
-        //Hp: the app is always used in landscape
-        return new Point((int) (screenPoint.x*scaleX), (int) (screenPoint.y*scaleY));
-    }
-
-    // Get xy screen coordinates from world 3D coordinate
-    private Point worldToScreen(float[] point, int width, int height, float[] projectionMatrix, float[] viewMatrix) {
-        float[] modelViewProjection = new float[16];
-        Matrix.multiplyMM(modelViewProjection, 0, projectionMatrix, 0, viewMatrix, 0);
-
-        float[] projectionCoord = new float[4];
-        float[] worldCoord = {point[0], point[1], point[2], 1};
-        Matrix.multiplyMV(projectionCoord, 0, modelViewProjection, 0, worldCoord, 0);
-
-        projectionCoord[0] = projectionCoord[0] / projectionCoord[3];
-        projectionCoord[1] = projectionCoord[1] / projectionCoord[3];
-
-        int screenX = (int) (projectionCoord[0] + 1 / 2. * width);
-        int screenY = (int) (1 - projectionCoord[1] / 2. * height);
-
-        return new Point(screenX, screenY);
-    }
 
     // Get predicted distance from prediction of a specific point
     private float getPredictionFromPoint(FloatBuffer prediction, Point point){
-        int position = (width * point.y) + point.x;
+        int position = (depthWidth * point.y) + point.x;
         prediction.rewind();
 
         return prediction.get(position);    // qualche controllo in caso di errore???

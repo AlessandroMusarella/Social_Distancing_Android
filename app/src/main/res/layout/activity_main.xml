@@ -30,13 +30,13 @@
       android:layout_width="50dp"
       android:layout_height="43dp"
       android:layout_marginLeft="15dp"
-      android:layout_marginTop="50dp"
+      android:layout_marginTop="35dp"
       android:text="FPS" />
 
   <TextView
       android:id="@+id/FPS_show"
       android:layout_width="50dp"
-      android:layout_height="50dp"
+      android:layout_height="35dp"
       android:layout_marginLeft="70dp"
       android:layout_marginTop="50dp"
       android:ems="10"

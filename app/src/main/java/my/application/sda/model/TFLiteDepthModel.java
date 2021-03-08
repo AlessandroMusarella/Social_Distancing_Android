@@ -15,17 +15,19 @@ import java.nio.MappedByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
-public class MLModel {
+public class TFLiteDepthModel {
 
     private Interpreter interpreter;
     private String mlName;
+    final public int depthWidth = 640;
+    final public int depthHeight = 384;
 
     private ByteBuffer inference;
 
-    public MLModel(String mlName){
+    public TFLiteDepthModel(String mlName){
         this.mlName = mlName;
 
-        inference = ByteBuffer.allocateDirect(640*384*1* DataType.FLOAT32.byteSize());
+        inference = ByteBuffer.allocateDirect(depthWidth*depthHeight* DataType.FLOAT32.byteSize());
         inference.order(ByteOrder.nativeOrder());
     }
 

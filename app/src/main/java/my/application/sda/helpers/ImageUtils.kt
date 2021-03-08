@@ -9,22 +9,6 @@ import java.io.ByteArrayOutputStream
 
 fun yuvToBitmap(image: Image): Bitmap{
 
-    /*
-    //The camera image received is in YUV YCbCr Format. Get buffers for each of the planes and use them to create a new bytearray defined by the size of all three buffers combined
-    val cameraPlaneY = image.planes[0].buffer
-    val cameraPlaneU = image.planes[1].buffer
-    val cameraPlaneV = image.planes[2].buffer
-
-    //Use the buffers to create a new byteArray that
-    val compositeByteArray = ByteArray(cameraPlaneY.capacity() + cameraPlaneU.capacity() + cameraPlaneV.capacity())
-
-    cameraPlaneY.get(compositeByteArray, 0, cameraPlaneY.capacity())
-    cameraPlaneU.get(compositeByteArray, cameraPlaneY.capacity(), cameraPlaneU.capacity())
-    cameraPlaneV.get(compositeByteArray, cameraPlaneY.capacity() + cameraPlaneU.capacity(), cameraPlaneV.capacity())
-    */
-
-
-
     val yBuffer = image.planes[0].buffer
     val vuBuffer = image.planes[2].buffer
 
@@ -35,10 +19,6 @@ fun yuvToBitmap(image: Image): Bitmap{
 
     yBuffer.get(nv21, 0, ySize)
     vuBuffer.get(nv21, ySize, vuSize)
-
-
-
-
 
 
     val baOutputStream = ByteArrayOutputStream()
