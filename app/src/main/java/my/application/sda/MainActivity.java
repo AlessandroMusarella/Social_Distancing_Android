@@ -16,9 +16,6 @@
 
 package my.application.sda;
 
-import android.graphics.Bitmap;
-import android.graphics.Color;
-import android.media.Image;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
@@ -48,25 +45,15 @@ import com.google.ar.core.examples.java.common.samplerender.Shader;
 import com.google.ar.core.examples.java.common.samplerender.VertexBuffer;
 import com.google.ar.core.examples.java.common.samplerender.arcore.BackgroundRenderer;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
-import com.google.ar.core.exceptions.NotYetAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
-import my.application.sda.calibrator.Calibrator;
-import my.application.sda.helpers.ImageUtilsKt;
 import my.application.sda.model.TFLiteDepthModel;
 
-import org.tensorflow.lite.support.common.ops.NormalizeOp;
-import org.tensorflow.lite.support.image.ImageProcessor;
-import org.tensorflow.lite.support.image.TensorImage;
-import org.tensorflow.lite.support.image.ops.ResizeWithCropOrPadOp;
-
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.FloatBuffer;
 
 /**
  * This is a simple example that shows how to create an augmented reality (AR) application using the
@@ -135,7 +122,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   long previousFrameTime = 0;
 
   // temp
-  TempClass tempClass;
+  DepthCalibrator depthCalibrator;
 
   protected PointCloud pointCloud;
 
@@ -390,12 +377,12 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     try (PointCloud pointCloud = frame.acquirePointCloud()) {   // da modificare!!!!!!!!
     if (cont > 120){
-      if(tempClass == null){
-        tempClass = new TempClass(this.getApplicationContext(), this.surfaceView.getWidth(), this.surfaceView.getHeight());
+      if(depthCalibrator == null){
+        depthCalibrator = new DepthCalibrator(this.getApplicationContext(), this.surfaceView.getWidth(), this.surfaceView.getHeight());
       }
 
       //pointCloud = frame.acquirePointCloud();
-      tempClass.doInference(frame, pointCloud);
+      depthCalibrator.doInference(frame, pointCloud);
       //pointCloud.release();
 
 

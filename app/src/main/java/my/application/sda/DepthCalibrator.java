@@ -23,7 +23,7 @@ import my.application.sda.calibrator.Calibrator;
 import my.application.sda.helpers.ImageUtilsKt;
 import my.application.sda.model.TFLiteDepthModel;
 
-public class TempClass {
+public class DepthCalibrator {
     // ML model for depth inference
     private TFLiteDepthModel model;
     private ImageProcessor imageProcessor;
@@ -46,7 +46,7 @@ public class TempClass {
     private double shiftFactor;
 
 
-    public TempClass(Context context, int viewWidth, int viewHeight){
+    public DepthCalibrator(Context context, int viewWidth, int viewHeight){
         model = new TFLiteDepthModel("tflite_pydnet.tflite");
         try {
             model.init(context);

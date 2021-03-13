@@ -26,6 +26,10 @@ android {
     buildFeatures {
         mlModelBinding true
     }
+    // Specify tflite file should not be compressed for the app apk
+    aaptOptions {
+        noCompress "tflite"
+    }
 }
 
 dependencies {
@@ -44,6 +48,7 @@ dependencies {
     implementation 'org.tensorflow:tensorflow-lite-metadata:0.1.0'
     implementation "androidx.core:core-ktx:+"
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation 'org.tensorflow:tensorflow-lite-task-vision:0.1.0'
 }
 repositories {
     mavenCentral()
