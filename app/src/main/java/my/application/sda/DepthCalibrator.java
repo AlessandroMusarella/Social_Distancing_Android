@@ -30,6 +30,7 @@ public class DepthCalibrator {
 
     // Current image
     private Image image;
+    private Bitmap imageBitmap;
 
     // Calibrator
     private Calibrator calibrator;
@@ -85,7 +86,7 @@ public class DepthCalibrator {
             e.printStackTrace();
             return;
         }
-        Bitmap imageBitmap = ImageUtilsKt.yuvToBitmap(image);
+        imageBitmap = ImageUtilsKt.yuvToBitmap(image);
 
         // Resize, crop and normalize via Tensorflow
         TensorImage tensorImage = new TensorImage();
@@ -150,5 +151,9 @@ public class DepthCalibrator {
         }
 
         return result;
+    }
+
+    public Bitmap getImageBitmap() {
+        return imageBitmap;
     }
 }

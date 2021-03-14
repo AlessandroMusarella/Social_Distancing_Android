@@ -28,6 +28,7 @@ public class ObjectDetection {
     private static final String TF_OD_API_LABELS_FILE = "labelmap.txt";
     private static final DetectorMode MODE = DetectorMode.TF_OD_API;
     private static final float MINIMUM_CONFIDENCE_TF_OD_API = 0.5f;
+    private static final int cropSize = 300;
     private Size  INPUT_SIZE = new Size(640, 480);
     private boolean computingDetection = false;
 
@@ -63,7 +64,7 @@ public class ObjectDetection {
             if (location != null && result.getConfidence() >= minimumConfidence && result.getTitle().equals("person")) {
                 canvas.drawRect(location, paint);
 
-                cropToFrameTransform.mapRect(location);
+                //cropToFrameTransform.mapRect(location);
                 result.setLocation(location);
                 mappedRecognitions.add(result);
             }

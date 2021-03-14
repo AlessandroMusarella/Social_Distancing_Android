@@ -16,11 +16,16 @@
 
 package my.application.sda;
 
+import android.content.Intent;
+import android.graphics.Bitmap;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -51,6 +56,7 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
+import my.application.sda.helpers.ImageUtil;
 import my.application.sda.model.TFLiteDepthModel;
 
 import java.io.IOException;
@@ -113,36 +119,41 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private final float[] viewInverseMatrix = new float[16];
   private int cont = 0;
 
-  // Variables for PyDNet model
-  private TFLiteDepthModel model;
-
   // Variables for count fps
   private TextView fpsShow;
   long currentFrameTime = 0;
   long previousFrameTime = 0;
 
+  // Button to take a picture and change screen
+  private Button takePicture;
+
   // temp
   DepthCalibrator depthCalibrator;
-
-  protected PointCloud pointCloud;
+  Bitmap currentFrameBitmap;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
     surfaceView = findViewById(R.id.surfaceview);
+
+    takePicture = (Button)findViewById(R.id.takePicture);
+    takePicture.setOnClickListener(new View.OnClickListener() {
+      public void onClick(View v) {
+        currentFrameBitmap = depthCalibrator.getImageBitmap();
+        ImageUtil.createImageFromBitmap(currentFrameBitmap, surfaceView.getContext());
+
+        Intent myIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
+        startActivityForResult(myIntent, 0);
+      }
+    });
+
     displayRotationHelper = new DisplayRotationHelper(/*context=*/ this);
     
     // Set up renderer.
     render = new SampleRender(surfaceView, this, getAssets());
 
-    // Set up PyDNet model and interpreter
-    model = new TFLiteDepthModel("tflite_pydnet.tflite");
-    try {
-      model.init(this.getApplicationContext());
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+
     fpsShow = (TextView)findViewById(R.id.FPS_show);
     currentFrameTime = SystemClock.elapsedRealtime();
 
@@ -364,6 +375,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     }
     Camera camera = frame.getCamera();
 
+
     // BackgroundRenderer.updateDisplayGeometry must be called every frame to update the coordinates
     // used to draw the background camera image.
     backgroundRenderer.updateDisplayGeometry(frame);
@@ -432,11 +444,15 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   }
 
 
-
   /** Configures the session with feature settings. */
   private void configureSession() {
     Config config = session.getConfig();
 
     session.configure(config);
   }
+
+  private void onTakePicture(){
+
+  }
+
 }
