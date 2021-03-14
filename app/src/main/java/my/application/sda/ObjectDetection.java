@@ -6,6 +6,7 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.graphics.Matrix;
 import android.util.Size;
 
 import java.io.IOException;
@@ -64,7 +65,7 @@ public class ObjectDetection {
             if (location != null && result.getConfidence() >= minimumConfidence && result.getTitle().equals("person")) {
                 canvas.drawRect(location, paint);
 
-                //cropToFrameTransform.mapRect(location);
+                cropToFrameTransform.mapRect(location);
                 result.setLocation(location);
                 mappedRecognitions.add(result);
             }

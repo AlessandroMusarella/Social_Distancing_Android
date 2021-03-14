@@ -56,6 +56,7 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
+import my.application.sda.calibrator.Point;
 import my.application.sda.helpers.ImageUtil;
 import my.application.sda.model.TFLiteDepthModel;
 
@@ -109,7 +110,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private long lastPointCloudTimestamp = 0;
 
 
-
   // Temporary matrix allocated here to reduce number of allocations for each frame.
   private final float[] modelMatrix = new float[16];
   private final float[] viewMatrix = new float[16];
@@ -119,17 +119,14 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private final float[] viewInverseMatrix = new float[16];
   private int cont = 0;
 
-  // Variables for count fps
-  private TextView fpsShow;
-  long currentFrameTime = 0;
-  long previousFrameTime = 0;
-
   // Button to take a picture and change screen
   private Button takePicture;
 
   // temp
   DepthCalibrator depthCalibrator;
   Bitmap currentFrameBitmap;
+  Frame currentFrame;
+  Point[] currentPointCloud;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -140,11 +137,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     takePicture = (Button)findViewById(R.id.takePicture);
     takePicture.setOnClickListener(new View.OnClickListener() {
       public void onClick(View v) {
-        currentFrameBitmap = depthCalibrator.getImageBitmap();
-        ImageUtil.createImageFromBitmap(currentFrameBitmap, surfaceView.getContext());
-
-        Intent myIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
-        startActivityForResult(myIntent, 0);
+        onTakePicture();
       }
     });
 
@@ -152,10 +145,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     
     // Set up renderer.
     render = new SampleRender(surfaceView, this, getAssets());
-
-
-    fpsShow = (TextView)findViewById(R.id.FPS_show);
-    currentFrameTime = SystemClock.elapsedRealtime();
 
     installRequested = false;
   }
@@ -334,18 +323,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       return;
     }
 
-    // Update the current fps
-    previousFrameTime = currentFrameTime;
-    currentFrameTime = SystemClock.elapsedRealtime();
-    fpsShow.setText("" + (int)1000.0/(currentFrameTime - previousFrameTime));
-
-    /*  pseudocodice di come sarà
-    if(!isProcessingFrame){
-      image = frame.image
-      output = MegaElaborator3000(image)
-    }
-    */
-
 
     // -- Manage ARCore Session
 
@@ -368,6 +345,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     Frame frame;
     try {
       frame = session.update();
+      currentFrame = frame;
     } catch (CameraNotAvailableException e) {
       Log.e(TAG, "Camera not available during onDrawFrame", e);
       messageSnackbarHelper.showError(this, "Camera not available. Try restarting the app.");
@@ -382,28 +360,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
     trackingStateHelper.updateKeepScreenOnFlag(camera.getTrackingState());
-
-
-    // -- Elaboration
-    //PyDNet Inference and calibration
-
-    try (PointCloud pointCloud = frame.acquirePointCloud()) {   // da modificare!!!!!!!!
-    if (cont > 120){
-      if(depthCalibrator == null){
-        depthCalibrator = new DepthCalibrator(this.getApplicationContext(), this.surfaceView.getWidth(), this.surfaceView.getHeight());
-      }
-
-      //pointCloud = frame.acquirePointCloud();
-      depthCalibrator.doInference(frame, pointCloud);
-      //pointCloud.release();
-
-
-      //People detection
-
-
-    }else{
-      cont++;
-    }
 
 
     // -- Draw background
@@ -430,9 +386,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     // Visualize tracked points.
     // Use try-with-resources to automatically release the point cloud.
+    try (PointCloud pointCloud = frame.acquirePointCloud()) {
       if (pointCloud.getTimestamp() > lastPointCloudTimestamp) {
         pointCloudVertexBuffer.set(pointCloud.getPoints());
         lastPointCloudTimestamp = pointCloud.getTimestamp();
+        currentPointCloud = Point.parsePointCloud(pointCloud);
       }
       Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
       pointCloudShader.setMat4("u_ModelViewProjection", modelViewProjectionMatrix);
@@ -452,7 +410,18 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   }
 
   private void onTakePicture(){
+    if(depthCalibrator == null){
+      depthCalibrator = new DepthCalibrator(this.getApplicationContext(), this.surfaceView.getWidth(), this.surfaceView.getHeight());
+    }
 
+    depthCalibrator.doInference(frame, currentPointCloud);
+
+
+    currentFrameBitmap = depthCalibrator.getImageBitmap();
+    ImageUtil.createImageFromBitmap(currentFrameBitmap, surfaceView.getContext());
+
+    Intent myIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
+    startActivityForResult(myIntent, 0);
   }
 
 }
