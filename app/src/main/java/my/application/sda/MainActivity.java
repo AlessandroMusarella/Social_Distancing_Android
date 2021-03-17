@@ -61,6 +61,8 @@ import my.application.sda.helpers.ImageUtil;
 import my.application.sda.model.TFLiteDepthModel;
 
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * This is a simple example that shows how to create an augmented reality (AR) application using the
@@ -125,8 +127,10 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   // temp
   DepthCalibrator depthCalibrator;
   Bitmap currentFrameBitmap;
+  Bitmap currentDepthBitmap;
   Frame currentFrame;
   Point[] currentPointCloud;
+  boolean isTakingPicture = false;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -137,6 +141,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     takePicture = (Button)findViewById(R.id.takePicture);
     takePicture.setOnClickListener(new View.OnClickListener() {
       public void onClick(View v) {
+        isTakingPicture = true;
         onTakePicture();
       }
     });
@@ -168,6 +173,8 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   @Override
   protected void onResume() {
     super.onResume();
+
+    isTakingPicture = false;
 
     if (session == null) {
       Exception exception = null;
@@ -319,6 +326,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   @Override
   public void onDrawFrame(SampleRender render) {
 
+    if(isTakingPicture){
+      return;
+    }
+
+
     if (session == null) {
       return;
     }
@@ -414,11 +426,17 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       depthCalibrator = new DepthCalibrator(this.getApplicationContext(), this.surfaceView.getWidth(), this.surfaceView.getHeight());
     }
 
-    depthCalibrator.doInference(frame, currentPointCloud);
+    depthCalibrator.doInference(currentFrame, currentPointCloud);
 
 
     currentFrameBitmap = depthCalibrator.getImageBitmap();
-    ImageUtil.createImageFromBitmap(currentFrameBitmap, surfaceView.getContext());
+    currentDepthBitmap = depthCalibrator.getDepthBitmap();
+
+    String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
+    String imageFileName = "sda-"+timeStamp+"-image.jpg";
+    String depthFileName = "sda-"+timeStamp+"-depth.jpg";
+    ImageUtil.createImageFromBitmap(currentFrameBitmap, imageFileName, surfaceView.getContext());
+    ImageUtil.createImageFromBitmap(currentDepthBitmap, depthFileName, surfaceView.getContext());
 
     Intent myIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
     startActivityForResult(myIntent, 0);

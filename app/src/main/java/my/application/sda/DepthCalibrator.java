@@ -20,6 +20,7 @@ import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
 import my.application.sda.calibrator.Calibrator;
+import my.application.sda.calibrator.Point;
 import my.application.sda.helpers.ImageUtilsKt;
 import my.application.sda.model.TFLiteDepthModel;
 
@@ -31,6 +32,7 @@ public class DepthCalibrator {
     // Current image
     private Image image;
     private Bitmap imageBitmap;
+    private Bitmap depthBitmap;
 
     // Calibrator
     private Calibrator calibrator;
@@ -65,19 +67,7 @@ public class DepthCalibrator {
         calibrator = new Calibrator(viewWidth, viewHeight, model.depthWidth, model.depthHeight, numberOfIterations, normalizedThreshold, percentagePossibleInlier);
     }
 
-    public FloatBuffer getDepthMap() {
-        return depthMap;
-    }
-
-    public double getScaleFactor() {
-        return scaleFactor;
-    }
-
-    public double getShiftFactor() {
-        return shiftFactor;
-    }
-
-    public void doInference(Frame frame, PointCloud pointCloud){
+    public void doInference(Frame frame, Point[] pointCloud){
 
         // Acquire current image from camera
         try {
@@ -112,6 +102,8 @@ public class DepthCalibrator {
             }
         }
         normalizedOutput.rewind();
+
+        //depthBitmap = Bitmap.createScaledBitmap(argbOutputBitmap, image.getWidth(), image.getHeight(), false);
 
 
         // Calibrate depth map
@@ -155,5 +147,19 @@ public class DepthCalibrator {
 
     public Bitmap getImageBitmap() {
         return imageBitmap;
+    }
+
+    public Bitmap getDepthBitmap() { return depthBitmap; }
+
+    public FloatBuffer getDepthMap() {
+        return depthMap;
+    }
+
+    public double getScaleFactor() {
+        return scaleFactor;
+    }
+
+    public double getShiftFactor() {
+        return shiftFactor;
     }
 }

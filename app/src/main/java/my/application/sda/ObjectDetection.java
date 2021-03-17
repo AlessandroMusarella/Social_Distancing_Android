@@ -39,7 +39,7 @@ public class ObjectDetection {
         tracker = new MultiBoxTracker(context);
     }
 
-    public void doTrackRecognitions(Bitmap croppedBitmap, Bitmap cropToFrameTransform, long currTimestamp){
+    public void doTrackRecognitions(Bitmap croppedBitmap, Matrix cropToFrameTransform, long currTimestamp){
         final List<Detector.Recognition> results = getODModel().recognizeImage(croppedBitmap);
         Bitmap cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
 

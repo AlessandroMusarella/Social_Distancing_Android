@@ -1,13 +1,18 @@
 package my.application.sda.helpers;
 
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Matrix;
+import android.net.Uri;
 import android.os.Environment;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /** Utility class for manipulating images. */
 public class ImageUtil {
@@ -49,7 +54,7 @@ public class ImageUtil {
      */
     public static void saveBitmap(final Bitmap bitmap, final String filename) {
         final String root =
-                Environment.getExternalStorageDirectory().getAbsolutePath() + File.separator + "tensorflow";
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS).getAbsolutePath();
         final File myDir = new File(root);
 
 
@@ -60,7 +65,7 @@ public class ImageUtil {
         }
         try {
             final FileOutputStream out = new FileOutputStream(file);
-            bitmap.compress(Bitmap.CompressFormat.PNG, 99, out);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
             out.flush();
             out.close();
         } catch (final Exception e) {
@@ -198,8 +203,7 @@ public class ImageUtil {
     }
 
 
-    public static String createImageFromBitmap(Bitmap bitmap, Context context) {
-        String fileName = "myImage";//no .png or .jpg needed
+    public static String createImageFromBitmap(Bitmap bitmap, String fileName, Context context) {
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream();
             bitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
@@ -213,5 +217,6 @@ public class ImageUtil {
         }
         return fileName;
     }
+
 }
 

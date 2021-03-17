@@ -71,20 +71,18 @@ public class Calibrator {
     }
 
 
-    public void calibrate(FloatBuffer prediction, PointCloud pointCloud){       // i punti sono da rilasciare alla fine con release???
+    public void calibrate(FloatBuffer prediction, my.application.sda.calibrator.Point[] pointCloud){       // i punti sono da rilasciare alla fine con release???
 
-        FloatBuffer points = pointCloud.getPoints();
-        points.rewind();
-        int numPoints = points.remaining() / 4;
+        int numPoints = pointCloud.length;
         float[] point = new float[4];
         RansacIntelObject[] ransacIntelObjects = new RansacIntelObject[numPoints];
 
         int numValidPoint = 0;
         for(int i=0; i<numPoints; i++){
-            point[0] = points.get();    //x
-            point[1] = points.get();    //y
-            point[2] = points.get();    //z
-            point[3] = points.get();    //confidence
+            point[0] = pointCloud[i].getX();
+            point[1] = pointCloud[i].getY();
+            point[2] = pointCloud[i].getZ();
+            point[3] = pointCloud[i].getConfidence();
 
             // Unproject point to screen
             Point screenPoint = CoordsUtils.worldToScreen(point, viewWidth, viewHeight, projectionMatrix, viewMatrix);
@@ -105,7 +103,6 @@ public class Calibrator {
 
             ransacIntelObjects[numValidPoint++] = new RansacIntelObject(1/distance, predictedDistance);     // 1/distance se è disparità
         }
-        points.rewind();
 
         // Need at least one element
         if(numValidPoint < 1){

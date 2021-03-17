@@ -23,6 +23,7 @@ public class Point {
             result[i] = new Point(point);
         }
 
+        points.rewind();
         return result;
     }
 
