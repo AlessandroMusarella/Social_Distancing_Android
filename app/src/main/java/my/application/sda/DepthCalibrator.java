@@ -59,8 +59,7 @@ public class DepthCalibrator {
 
         int temp = model.depthWidth*viewHeight/viewWidth;
 
-        imageProcessor = new ImageProcessor.Builder().add(new ResizeWithCropOrPadOp(model.depthWidth*viewHeight/viewWidth, model.depthWidth))
-                                                     .add(new ResizeOp(model.depthHeight, model.depthWidth, ResizeOp.ResizeMethod.BILINEAR))
+        imageProcessor = new ImageProcessor.Builder().add(new ResizeOp(model.depthHeight, model.depthWidth, ResizeOp.ResizeMethod.BILINEAR))
                                                      .add(new NormalizeOp(0,255))
                                                      .build();
 
@@ -103,7 +102,7 @@ public class DepthCalibrator {
         }
         normalizedOutput.rewind();
 
-        //depthBitmap = Bitmap.createScaledBitmap(argbOutputBitmap, image.getWidth(), image.getHeight(), false);
+        depthBitmap = Bitmap.createScaledBitmap(argbOutputBitmap, image.getWidth(), image.getHeight(), false);
 
 
         // Calibrate depth map

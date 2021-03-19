@@ -93,7 +93,7 @@ public class MultiBoxTracker {
         }
     }
 
-    public synchronized void trackResults(final List<Detector.Recognition> results, final long timestamp) {
+    public synchronized void trackResults(final List<Detector.Recognition> results) {
         processResults(results);
     }
 

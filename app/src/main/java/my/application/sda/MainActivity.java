@@ -18,15 +18,15 @@ package my.application.sda;
 
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.Typeface;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
-import android.os.SystemClock;
 import android.util.Log;
+import android.util.TypedValue;
+import android.view.Surface;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -56,13 +56,13 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
+import java.io.IOException;
+import java.util.Date;
+
 import my.application.sda.calibrator.Point;
 import my.application.sda.helpers.ImageUtil;
-import my.application.sda.model.TFLiteDepthModel;
 
-import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
 
 /**
  * This is a simple example that shows how to create an augmented reality (AR) application using the
@@ -132,11 +132,81 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   Point[] currentPointCloud;
   boolean isTakingPicture = false;
 
+
+
+
+  //Object Detection variables
+  private static final String TF_OD_API_MODEL_FILE = "detect.tflite";
+  private static final int TF_OD_API_INPUT_SIZE = 300;
+  private static final float TEXT_SIZE_DIP = 10;
+  private static final boolean MAINTAIN_ASPECT = false;
+  private ObjectDetection objectDetection = new ObjectDetection();
+  private android.graphics.Matrix frameToCropTransform;
+  private android.graphics.Matrix cropToFrameTransform;
+  private int previewWidth, previewHeight;
+  private Integer sensorOrientation;
+  private Bitmap rgbFrameBitmap = null;
+  private Bitmap croppedBitmap = null;
+  private Bitmap cropCopyBitmap = null;
+  private Bitmap detectionBitmap = null;
+
+  /*
+    Considerazioni generali:
+    molti di queste variabili all'interno di TFL Object Detection vengono inizializzate dentro onPreviewSizeChosen(final Size size, final int rotation)
+
+    -> primo tentativo: utilizzare i nostri metodi già presenti dentro al progetto per la calibrator
+   */
+
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
     surfaceView = findViewById(R.id.surfaceview);
+
+
+    //object detection code
+    final float textSizePx =
+            TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
+    try {
+      objectDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE, textSizePx);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    objectDetection.getBorderedText().setTypeface(Typeface.MONOSPACE);
+
+    int cropSize = TF_OD_API_INPUT_SIZE;
+
+    /*
+    previewWidth = size.getWidth();
+    previewHeight = size.getHeight();
+
+    sensorOrientation = rotation - getScreenOrientation();
+    */
+    previewWidth = 640;
+    previewHeight = 480;
+    sensorOrientation = 90;
+
+
+    rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888);
+    croppedBitmap = Bitmap.createBitmap(cropSize, cropSize, Bitmap.Config.ARGB_8888);
+
+    frameToCropTransform =
+            ImageUtil.getTransformationMatrix(
+                    previewWidth, previewHeight,
+                    cropSize, cropSize,
+                    sensorOrientation, MAINTAIN_ASPECT);
+
+    cropToFrameTransform = new android.graphics.Matrix();
+    frameToCropTransform.invert(cropToFrameTransform);
+
+    objectDetection.getTracker().setFrameConfiguration(previewWidth, previewHeight, sensorOrientation);
+
+    /*
+    final Canvas canvas_init = new Canvas(croppedBitmap);
+    canvas_init.drawBitmap(rgbFrameBitmap, frameToCropTransform, null);
+     */
 
     takePicture = (Button)findViewById(R.id.takePicture);
     takePicture.setOnClickListener(new View.OnClickListener() {
@@ -428,18 +498,32 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     depthCalibrator.doInference(currentFrame, currentPointCloud);
 
-
     currentFrameBitmap = depthCalibrator.getImageBitmap();
     currentDepthBitmap = depthCalibrator.getDepthBitmap();
+    detectionBitmap = objectDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform);
 
     String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
     String imageFileName = "sda-"+timeStamp+"-image.jpg";
     String depthFileName = "sda-"+timeStamp+"-depth.jpg";
+    String detectionFileName = "sda-"+timeStamp+"-detection.jpg";
     ImageUtil.createImageFromBitmap(currentFrameBitmap, imageFileName, surfaceView.getContext());
     ImageUtil.createImageFromBitmap(currentDepthBitmap, depthFileName, surfaceView.getContext());
+    ImageUtil.createImageFromBitmap(detectionBitmap, detectionFileName, surfaceView.getContext());
 
     Intent myIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
     startActivityForResult(myIntent, 0);
   }
 
+  protected int getScreenOrientation() {
+    switch (getWindowManager().getDefaultDisplay().getRotation()) {
+      case Surface.ROTATION_270:
+        return 270;
+      case Surface.ROTATION_180:
+        return 180;
+      case Surface.ROTATION_90:
+        return 90;
+      default:
+        return 0;
+    }
+  }
 }
