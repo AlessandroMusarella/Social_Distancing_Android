@@ -22,11 +22,15 @@ import android.graphics.Typeface;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Surface;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -56,13 +60,13 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
-import java.io.IOException;
-import java.util.Date;
-
 import my.application.sda.calibrator.Point;
 import my.application.sda.helpers.ImageUtil;
+import my.application.sda.model.TFLiteDepthModel;
 
+import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.Date;
 
 /**
  * This is a simple example that shows how to create an augmented reality (AR) application using the
@@ -122,7 +126,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private int cont = 0;
 
   // Button to take a picture and change screen
-  private Button takePicture;
+  private ImageButton takePicture;
 
   // temp
   DepthCalibrator depthCalibrator;
@@ -131,9 +135,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   Frame currentFrame;
   Point[] currentPointCloud;
   boolean isTakingPicture = false;
-
-
-
 
   //Object Detection variables
   private static final String TF_OD_API_MODEL_FILE = "detect.tflite";
@@ -153,17 +154,16 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   /*
     Considerazioni generali:
     molti di queste variabili all'interno di TFL Object Detection vengono inizializzate dentro onPreviewSizeChosen(final Size size, final int rotation)
-
     -> primo tentativo: utilizzare i nostri metodi già presenti dentro al progetto per la calibrator
    */
 
+  Intent intent;    // to switch between activities
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
     surfaceView = findViewById(R.id.surfaceview);
-
 
     //object detection code
     final float textSizePx =
@@ -181,7 +181,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     /*
     previewWidth = size.getWidth();
     previewHeight = size.getHeight();
-
     sensorOrientation = rotation - getScreenOrientation();
     */
     previewWidth = 640;
@@ -208,7 +207,8 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     canvas_init.drawBitmap(rgbFrameBitmap, frameToCropTransform, null);
      */
 
-    takePicture = (Button)findViewById(R.id.takePicture);
+
+    takePicture = (ImageButton)findViewById(R.id.takePicture);
     takePicture.setOnClickListener(new View.OnClickListener() {
       public void onClick(View v) {
         isTakingPicture = true;
@@ -510,8 +510,10 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     ImageUtil.createImageFromBitmap(currentDepthBitmap, depthFileName, surfaceView.getContext());
     ImageUtil.createImageFromBitmap(detectionBitmap, detectionFileName, surfaceView.getContext());
 
-    Intent myIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
-    startActivityForResult(myIntent, 0);
+    if(intent == null) {
+      intent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
+    }
+    startActivityForResult(intent, 0);
   }
 
   protected int getScreenOrientation() {
@@ -526,4 +528,5 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
         return 0;
     }
   }
+
 }

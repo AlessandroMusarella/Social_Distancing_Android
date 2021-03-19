@@ -25,10 +25,19 @@
       android:layout_height="fill_parent"
       android:layout_gravity="top" />
 
-  <Button
+  <ImageButton
       android:id="@+id/takePicture"
-      android:layout_width="154dp"
-      android:layout_height="118dp"
-      android:text="Button" />
+      android:layout_width="125dp"
+      android:layout_height="125dp"
+      android:layout_alignParentTop="true"
+      android:layout_alignParentEnd="true"
+      android:layout_centerInParent="true"
+      android:layout_marginTop="143dp"
+      android:layout_marginEnd="7dp"
+      android:adjustViewBounds="false"
+      android:background="#00FFFFFF"
+      android:cropToPadding="false"
+      android:scaleType="fitXY"
+      android:src="@drawable/camera_button" />
 
 </RelativeLayout>

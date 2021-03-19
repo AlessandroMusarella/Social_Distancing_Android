@@ -102,8 +102,8 @@ public class DepthCalibrator {
         }
         normalizedOutput.rewind();
 
-        depthBitmap = Bitmap.createScaledBitmap(argbOutputBitmap, image.getWidth(), image.getHeight(), false);
-
+        depthBitmap = Bitmap.createScaledBitmap(argbOutputBitmap, image.getWidth(), image.getHeight(), true);
+        //depthBitmap = argbOutputBitmap;
 
         // Calibrate depth map
         frame.getCamera().getProjectionMatrix(projectionMatrix, 0, 0.05f, 100f);
