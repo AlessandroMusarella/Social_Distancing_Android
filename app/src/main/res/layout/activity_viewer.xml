@@ -9,6 +9,6 @@
     <!-- viewpager to show images -->
     <androidx.viewpager.widget.ViewPager
         android:id="@+id/viewPagerMain"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"/>
 </RelativeLayout>

@@ -15,7 +15,6 @@ import androidx.annotation.NonNull;
 import androidx.viewpager.widget.PagerAdapter;
 
 import java.io.FileNotFoundException;
-import java.lang.reflect.Array;
 import java.util.Objects;
 
 import my.application.sda.R;

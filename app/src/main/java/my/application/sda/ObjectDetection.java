@@ -47,7 +47,8 @@ public class ObjectDetection {
         tracker = new MultiBoxTracker(context);
     }
 
-    public Bitmap getRecognitionsTrackedfrom(Bitmap currentFrameBitmap, Matrix cropToFrameTransform){
+
+    public Bitmap getRecognitionBitmapfrom(Bitmap currentFrameBitmap, Matrix cropToFrameTransform){
 
         currentFrameBitmap = currentFrameBitmap.copy(Bitmap.Config.ARGB_8888, true);
         croppedBitmap = Bitmap.createScaledBitmap(currentFrameBitmap, 300, 300, true);
@@ -82,56 +83,39 @@ public class ObjectDetection {
                 mappedRecognitions.add(result);
             }
         }
-        tracker.trackResults(mappedRecognitions);
+        //tracker.trackResults(mappedRecognitions);
 
         return Bitmap.createScaledBitmap(cropCopyBitmap, getINPUT_SIZE().getWidth(), getINPUT_SIZE().getHeight(), true);
 
     }
 
-    public static Bitmap convertToMutable(Bitmap imgIn) {
-        try {
-            //this is the file going to use temporally to save the bytes.
-            // This file will not be a image, it will store the raw image data.
-            File file = new File(Environment.getExternalStorageDirectory() + File.separator + "temp.tmp");
+    public List<Detector.Recognition> getRecognitionsTrackedfrom(Bitmap currentFrameBitmap, Matrix cropToFrameTransform){
 
-            //Open an RandomAccessFile
-            //Make sure you have added uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-            //into AndroidManifest.xml file
-            RandomAccessFile randomAccessFile = new RandomAccessFile(file, "rw");
+        currentFrameBitmap = currentFrameBitmap.copy(Bitmap.Config.ARGB_8888, true);
+        croppedBitmap = Bitmap.createScaledBitmap(currentFrameBitmap, 300, 300, true);
 
-            // get the width and height of the source bitmap.
-            int width = imgIn.getWidth();
-            int height = imgIn.getHeight();
-            Bitmap.Config type = imgIn.getConfig();
+        final List<Detector.Recognition> results = getODModel().recognizeImage(croppedBitmap);
 
-            //Copy the byte to the file
-            //Assume source bitmap loaded using options.inPreferredConfig = Config.ARGB_8888;
-            FileChannel channel = randomAccessFile.getChannel();
-            MappedByteBuffer map = channel.map(FileChannel.MapMode.READ_WRITE, 0, imgIn.getRowBytes()*height);
-            imgIn.copyPixelsToBuffer(map);
-            //recycle the source bitmap, this will be no longer used.
-            imgIn.recycle();
-            System.gc();// try to force the bytes from the imgIn to be released
-
-            //Create a new bitmap to load the bitmap again. Probably the memory will be available.
-            imgIn = Bitmap.createBitmap(width, height, type);
-            map.position(0);
-            //load it back from temporary
-            imgIn.copyPixelsFromBuffer(map);
-            //close the temporary file and channel , then delete that also
-            channel.close();
-            randomAccessFile.close();
-
-            // delete the temp file
-            file.delete();
-
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+        float minimumConfidence = MINIMUM_CONFIDENCE_TF_OD_API;
+        switch (MODE) {
+            case TF_OD_API:
+                minimumConfidence = MINIMUM_CONFIDENCE_TF_OD_API;
+                break;
         }
 
-        return imgIn;
+        final List<Detector.Recognition> mappedRecognitions =
+                new ArrayList<Detector.Recognition>();
+
+        for (final Detector.Recognition result : results) {
+            final RectF location = result.getLocation();
+            if (location != null && result.getConfidence() >= minimumConfidence && result.getTitle().equals("person")) {
+                cropToFrameTransform.mapRect(location);
+                result.setLocation(location);
+                mappedRecognitions.add(result);
+            }
+        }
+
+        return mappedRecognitions;
     }
 
     public TFLiteObjectDetectionModel getODModel() {

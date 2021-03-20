@@ -151,6 +151,9 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private Bitmap cropCopyBitmap = null;
   private Bitmap detectionBitmap = null;
 
+  //tracker
+  private DistanceTracker distanceTracker = new DistanceTracker();
+
   /*
     Considerazioni generali:
     molti di queste variabili all'interno di TFL Object Detection vengono inizializzate dentro onPreviewSizeChosen(final Size size, final int rotation)
@@ -201,11 +204,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     frameToCropTransform.invert(cropToFrameTransform);
 
     objectDetection.getTracker().setFrameConfiguration(previewWidth, previewHeight, sensorOrientation);
-
-    /*
-    final Canvas canvas_init = new Canvas(croppedBitmap);
-    canvas_init.drawBitmap(rgbFrameBitmap, frameToCropTransform, null);
-     */
 
 
     takePicture = (ImageButton)findViewById(R.id.takePicture);
@@ -500,7 +498,16 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     currentFrameBitmap = depthCalibrator.getImageBitmap();
     currentDepthBitmap = depthCalibrator.getDepthBitmap();
-    detectionBitmap = objectDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform);
+    //detectionBitmap = objectDetection.getRecognitionBitmapfrom(currentFrameBitmap, cropToFrameTransform);
+
+    float[] viewMatrix = new float[16];
+    float[] projectionMatrix = new float[16];
+    currentFrame.getCamera().getProjectionMatrix(projectionMatrix, 0, 0.05f, 100f);
+    currentFrame.getCamera().getViewMatrix(viewMatrix, 0);
+
+    distanceTracker.setCameraMatrix(viewMatrix, projectionMatrix);
+    distanceTracker.setDepthMap(depthCalibrator.getDepthMap(), (float)depthCalibrator.getScaleFactor(), (float)depthCalibrator.getShiftFactor());
+    detectionBitmap = distanceTracker.getTrackedBitmap(currentFrameBitmap, objectDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform));
 
     String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
     String depthFileName = "sda-"+timeStamp+"-1depth.jpg";
