@@ -15,9 +15,12 @@ import androidx.annotation.NonNull;
 import androidx.viewpager.widget.PagerAdapter;
 
 import java.io.FileNotFoundException;
+import java.lang.reflect.Array;
 import java.util.Objects;
 
 import my.application.sda.R;
+
+import java.util.Arrays;
 
 public class ViewPagerAdapter extends PagerAdapter {
 
@@ -35,6 +38,7 @@ public class ViewPagerAdapter extends PagerAdapter {
     public ViewPagerAdapter(Context context) {
         this.context = context;
         this.imagePaths = context.getFilesDir().list();
+        Arrays.sort(imagePaths);
         mLayoutInflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
     }
 

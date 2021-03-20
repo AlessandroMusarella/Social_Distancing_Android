@@ -503,10 +503,8 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     detectionBitmap = objectDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform);
 
     String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
-    String imageFileName = "sda-"+timeStamp+"-image.jpg";
-    String depthFileName = "sda-"+timeStamp+"-depth.jpg";
-    String detectionFileName = "sda-"+timeStamp+"-detection.jpg";
-    ImageUtil.createImageFromBitmap(currentFrameBitmap, imageFileName, surfaceView.getContext());
+    String depthFileName = "sda-"+timeStamp+"-1depth.jpg";
+    String detectionFileName = "sda-"+timeStamp+"-2detection.jpg";
     ImageUtil.createImageFromBitmap(currentDepthBitmap, depthFileName, surfaceView.getContext());
     ImageUtil.createImageFromBitmap(detectionBitmap, detectionFileName, surfaceView.getContext());
 
