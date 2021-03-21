@@ -188,7 +188,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     */
     previewWidth = 640;
     previewHeight = 480;
-    sensorOrientation = 90;
+    sensorOrientation = 0;
 
 
     rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888);

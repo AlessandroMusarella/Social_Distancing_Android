@@ -9,6 +9,7 @@ import com.google.ar.core.Frame;
 import com.google.ar.core.PointCloud;
 import com.google.ar.core.exceptions.NotYetAvailableException;
 
+import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.support.common.ops.NormalizeOp;
 import org.tensorflow.lite.support.image.ImageProcessor;
 import org.tensorflow.lite.support.image.TensorImage;
@@ -103,7 +104,6 @@ public class DepthCalibrator {
         normalizedOutput.rewind();
 
         depthBitmap = Bitmap.createScaledBitmap(argbOutputBitmap, image.getWidth(), image.getHeight(), true);
-        //depthBitmap = argbOutputBitmap;
 
         // Calibrate depth map
         frame.getCamera().getProjectionMatrix(projectionMatrix, 0, 0.05f, 100f);
@@ -113,7 +113,7 @@ public class DepthCalibrator {
 
         scaleFactor = calibrator.getScaleFactor();
         shiftFactor = calibrator.getShiftFactor();
-        depthMap = normalizedOutput;
+        depthMap = bufferFromBitmap(depthBitmap);
 
         image.close();
     }
@@ -141,6 +141,23 @@ public class DepthCalibrator {
             result.put(normalizedDepth);
         }
 
+        return result;
+    }
+
+    // return a FloatBuffer, with values in [0,1], from a depth bitmap, with values from [0,255]
+    private FloatBuffer bufferFromBitmap(Bitmap bitmap){
+        int numValues= bitmap.getWidth()*bitmap.getHeight();
+        FloatBuffer result = FloatBuffer.allocate(DataType.FLOAT32.byteSize()*numValues);
+
+        for (int i=0; i<numValues; i++){
+            int color = bitmap.getPixel(i % bitmap.getWidth(), i / bitmap.getWidth());
+            int R = (color >> 16) & 0xff;
+
+            float value = (float) R / 255f;
+            result.put(value);
+        }
+
+        result.rewind();
         return result;
     }
 

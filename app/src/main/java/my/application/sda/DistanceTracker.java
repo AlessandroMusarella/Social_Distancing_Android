@@ -52,20 +52,20 @@ public class DistanceTracker {
             paints[i].setStrokeWidth(2.0f);
         }
 
-        Float3[] cordinates = get3dCoordinates(mappedRecognitions);
+        Float3[] coordinates = get3dCoordinates(mappedRecognitions);
 
         for (int i = 0; i < mappedRecognitions.size(); i++) {
-            float miniDistance = Float.MAX_VALUE;
+            float minDistance = Float.MAX_VALUE;
             for (int j = 0; j < mappedRecognitions.size() && j != i; j++) {
-                float tempDistance = getDistanceBetweenPeople(cordinates[i], cordinates[j]);
-                if (tempDistance < miniDistance)
-                    miniDistance = tempDistance;
+                float tempDistance = getDistanceBetweenPeople(coordinates[i], coordinates[j]);
+                if (tempDistance < minDistance)
+                    minDistance = tempDistance;
             }
-            if (miniDistance > 2)
+            if (minDistance > 2)
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[GREEN]);
-            else if (miniDistance > 1 && miniDistance < 2)
+            else if (minDistance > 1 && minDistance < 2)
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[YELLOW]);
-            else if (miniDistance < 1) {
+            else if (minDistance < 1) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[RED]);
             }
         }
