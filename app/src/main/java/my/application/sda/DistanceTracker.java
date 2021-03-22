@@ -4,6 +4,7 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.opengl.Matrix;
 import android.renderscript.Float3;
 
@@ -35,8 +36,19 @@ public class DistanceTracker {
     private static final int GREEN = 1;
     private static final int YELLOW = 2;
 
+    private Paint[] paints;
+
+    private Path path;
+
     public DistanceTracker(){
         super();
+        paints = new Paint[3];
+        for(int i=0; i<paints.length; i++){
+            paints[i] = new Paint();
+            paints[i].setColor(COLORS[i]);
+            paints[i].setStyle(Paint.Style.STROKE);
+            paints[i].setStrokeWidth(2.0f);
+        }
     }
 
     public Bitmap getTrackedBitmap (Bitmap currentFrame, List<Detector.Recognition> mappedRecognitions){
@@ -44,28 +56,33 @@ public class DistanceTracker {
         Bitmap resultBitmap = currentFrame.copy(Bitmap.Config.ARGB_8888, true);
         final Canvas canvas = new Canvas(resultBitmap);
 
-        final Paint[] paints = new Paint[3];
-        for(int i=0; i<paints.length; i++){
-            paints[i] = new Paint();
-            paints[i].setColor(COLORS[i]);
-            paints[i].setStyle(Paint.Style.STROKE);
-            paints[i].setStrokeWidth(2.0f);
-        }
-
         Float3[] coordinates = get3dCoordinates(mappedRecognitions);
 
         for (int i = 0; i < mappedRecognitions.size(); i++) {
             float minDistance = Float.MAX_VALUE;
-            for (int j = 0; j < mappedRecognitions.size() && j != i; j++) {
-                float tempDistance = getDistanceBetweenPeople(coordinates[i], coordinates[j]);
-                if (tempDistance < minDistance)
-                    minDistance = tempDistance;
+            int minJ = -1;
+            for (int j = 0; j < mappedRecognitions.size(); j++) {
+                if (i != j) {
+                    float tempDistance = getDistanceBetweenPeople(coordinates[i], coordinates[j]);
+                    if (tempDistance < minDistance) {
+                        minDistance = tempDistance;
+                        minJ = j;
+                    }
+                }
             }
-            if (minDistance > 2)
+            if (minDistance > 2) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[GREEN]);
-            else if (minDistance > 1 && minDistance < 2)
+            } else if (minDistance > 1 && minDistance < 2){
+                path = new Path();
+                path.moveTo(mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY());
+                path.lineTo(mappedRecognitions.get(minJ).getLocation().centerX(), mappedRecognitions.get(minJ).getLocation().centerY());
+                canvas.drawTextOnPath("" + minDistance, path, 3f, 1f, paints[YELLOW]);
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[YELLOW]);
-            else if (minDistance < 1) {
+            }else if (minDistance < 1) {
+                path = new Path();
+                path.moveTo(mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY());
+                path.lineTo(mappedRecognitions.get(minJ).getLocation().centerX(), mappedRecognitions.get(minJ).getLocation().centerY());
+                canvas.drawTextOnPath("" + minDistance, path, 3f, 1f, paints[RED]);
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[RED]);
             }
         }
@@ -85,8 +102,8 @@ public class DistanceTracker {
     }
 
     private Float3[] get3dCoordinates(List<Detector.Recognition> mappedRecognitions){
-        float A = -1.000001f;
-        float B = -0.001000001f;
+        float A = projectionMatrix[10];
+        float B = projectionMatrix[11];
         Float3[] result = new Float3[mappedRecognitions.size()];
         float[] viewProj = new float[16];
         float[] inverse = new float[16];

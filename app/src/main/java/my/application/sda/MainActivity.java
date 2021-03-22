@@ -498,7 +498,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     currentFrameBitmap = depthCalibrator.getImageBitmap();
     currentDepthBitmap = depthCalibrator.getDepthBitmap();
-    //detectionBitmap = objectDetection.getRecognitionBitmapfrom(currentFrameBitmap, cropToFrameTransform);
 
     float[] viewMatrix = new float[16];
     float[] projectionMatrix = new float[16];
