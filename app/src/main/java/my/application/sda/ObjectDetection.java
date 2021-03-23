@@ -108,7 +108,7 @@ public class ObjectDetection {
 
         for (final Detector.Recognition result : results) {
             final RectF location = result.getLocation();
-            if (location != null && result.getConfidence() >= minimumConfidence && result.getTitle().equals("person")) {
+            if (location != null && result.getConfidence() >= minimumConfidence && result.getTitle().equals("cat")) {
                 cropToFrameTransform.mapRect(location);
                 result.setLocation(location);
                 mappedRecognitions.add(result);

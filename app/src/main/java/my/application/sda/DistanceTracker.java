@@ -20,6 +20,7 @@ public class DistanceTracker {
     private float[] projectionMatrix = new float[16];
     private int height;
     private int width;
+    float fx_d, fy_d, cx_d, cy_d;
 
     // Depth
     private FloatBuffer depthMap;
@@ -59,6 +60,7 @@ public class DistanceTracker {
         final Canvas canvas = new Canvas(resultBitmap);
 
         Float3[] coordinates = get3dCoordinates(mappedRecognitions);
+        Float3[] coordinatesOld = get3dCoordinatesOLD(mappedRecognitions);
 
         for (int i = 0; i < mappedRecognitions.size(); i++) {
             float minDistance = Float.MAX_VALUE;
@@ -66,6 +68,7 @@ public class DistanceTracker {
             for (int j = 0; j < mappedRecognitions.size(); j++) {
                 if (i != j) {
                     float tempDistance = getDistanceBetweenPeople(coordinates[i], coordinates[j]);
+                    float oldDistance = getDistanceBetweenPeople(coordinatesOld[i], coordinatesOld[j]);
                     if (tempDistance < minDistance) {
                         minDistance = tempDistance;
                         minJ = j;
@@ -98,12 +101,16 @@ public class DistanceTracker {
         this.shiftFactor = shiftFactor;
     }
 
-    public void setCameraMatrix(float[] viewMatrix, float[] projectionMatrix){
+    public void setCameraMatrix(float[] viewMatrix, float[] projectionMatrix, float fx_d, float fy_d, float cx_d, float cy_d){
         this.viewMatrix = viewMatrix;
         this.projectionMatrix = projectionMatrix;
+        this.fx_d = fx_d;
+        this.fy_d = fy_d;
+        this.cx_d = cx_d;
+        this.cy_d = cy_d;
     }
 
-    private Float3[] get3dCoordinates(List<Detector.Recognition> mappedRecognitions){
+    private Float3[] get3dCoordinatesOLD(List<Detector.Recognition> mappedRecognitions){
         float A = projectionMatrix[10];
         float B = projectionMatrix[11];
         Float3[] result = new Float3[mappedRecognitions.size()];
@@ -140,6 +147,38 @@ public class DistanceTracker {
             position[0] = position[0] / position[3];
             position[1] = position[1] / position[3];
             position[2] = position[2] / position[3];
+
+            result[i] = new Float3(position[0], position[1], position[2]);
+        }
+
+        return result;
+    }
+
+    private Float3[] get3dCoordinates(List<Detector.Recognition> mappedRecognitions){
+        float A = projectionMatrix[10];
+        float B = projectionMatrix[11];
+        Float3[] result = new Float3[mappedRecognitions.size()];
+        float[] viewProj = new float[16];
+        float[] inverse = new float[16];
+        float[] position = new float[4];
+
+        width = 640;
+        height = 480;
+
+        Matrix.multiplyMM(viewProj, 0, projectionMatrix, 0 , viewMatrix, 0);
+        Matrix.invertM(inverse, 0, viewProj, 0);
+
+        for(int i=0; i<mappedRecognitions.size(); i++){
+            int x_screen = (int) mappedRecognitions.get(i).getLocation().centerX(); //???????????????????????????????????
+            int y_screen = (int) mappedRecognitions.get(i).getLocation().centerY(); //???????????????????????????????????
+
+            float depth = depthMap.get(y_screen*width + x_screen);  //disparity value, between [0,1]
+            depth = depth * scaleFactor + shiftFactor;
+            depth = 1 / depth;  //distance from the camera measured in meters
+
+            position[0] = (x_screen - cx_d) * depth / fx_d;
+            position[1] = (y_screen - cy_d) * depth / fy_d;
+            position[2] = depth;
 
             result[i] = new Float3(position[0], position[1], position[2]);
         }

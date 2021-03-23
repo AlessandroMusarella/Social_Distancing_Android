@@ -538,8 +538,14 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     float[] projectionMatrix = new float[16];
     currentFrame.getCamera().getProjectionMatrix(projectionMatrix, 0, 0.05f, 100f);
     currentFrame.getCamera().getViewMatrix(viewMatrix, 0);
+    float fx_d, fy_d, cx_d, cy_d;
+    fx_d = currentFrame.getCamera().getImageIntrinsics().getFocalLength()[0];
+    fy_d = currentFrame.getCamera().getImageIntrinsics().getFocalLength()[1];
+    cx_d = currentFrame.getCamera().getImageIntrinsics().getPrincipalPoint()[0];
+    cy_d = currentFrame.getCamera().getImageIntrinsics().getPrincipalPoint()[1];
 
-    distanceTracker.setCameraMatrix(viewMatrix, projectionMatrix);
+
+    distanceTracker.setCameraMatrix(viewMatrix, projectionMatrix, fx_d, fy_d, cx_d, cy_d);
     distanceTracker.setDepthMap(depthCalibrator.getDepthMap(), (float)depthCalibrator.getScaleFactor(), (float)depthCalibrator.getShiftFactor());
     detectionBitmap = distanceTracker.getTrackedBitmap(currentFrameBitmap, objectDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform));
 
