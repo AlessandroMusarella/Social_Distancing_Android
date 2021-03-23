@@ -48,7 +48,9 @@ public class DistanceTracker {
             paints[i].setColor(COLORS[i]);
             paints[i].setStyle(Paint.Style.STROKE);
             paints[i].setStrokeWidth(2.0f);
+            paints[i].setTextSize(12);
         }
+        path = new Path();
     }
 
     public Bitmap getTrackedBitmap (Bitmap currentFrame, List<Detector.Recognition> mappedRecognitions){
@@ -73,15 +75,15 @@ public class DistanceTracker {
             if (minDistance > 2) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[GREEN]);
             } else if (minDistance > 1 && minDistance < 2){
-                path = new Path();
                 path.moveTo(mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY());
                 path.lineTo(mappedRecognitions.get(minJ).getLocation().centerX(), mappedRecognitions.get(minJ).getLocation().centerY());
+                canvas.drawPath(path, paints[YELLOW]);
                 canvas.drawTextOnPath("" + minDistance, path, 3f, 1f, paints[YELLOW]);
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[YELLOW]);
             }else if (minDistance < 1) {
-                path = new Path();
                 path.moveTo(mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY());
                 path.lineTo(mappedRecognitions.get(minJ).getLocation().centerX(), mappedRecognitions.get(minJ).getLocation().centerY());
+                canvas.drawPath(path, paints[RED]);
                 canvas.drawTextOnPath("" + minDistance, path, 3f, 1f, paints[RED]);
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[RED]);
             }

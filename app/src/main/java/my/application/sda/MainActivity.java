@@ -16,12 +16,15 @@
 
 package my.application.sda;
 
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.SystemClock;
 import android.util.Log;
 import android.util.TypedValue;
@@ -64,8 +67,10 @@ import my.application.sda.calibrator.Point;
 import my.application.sda.helpers.ImageUtil;
 import my.application.sda.model.TFLiteDepthModel;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 
 /**
@@ -128,6 +133,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   // Button to take a picture and change screen
   private ImageButton takePicture;
 
+  //Button to see the picture saved in gallery
+  private ImageButton viewGallery;
+
+  //text
+
   // temp
   DepthCalibrator depthCalibrator;
   Bitmap currentFrameBitmap;
@@ -153,6 +163,10 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
   //tracker
   private DistanceTracker distanceTracker = new DistanceTracker();
+
+  private String[] imagePaths;
+  private Context context;
+  private int dimTemp = 0;
 
   /*
     Considerazioni generali:
@@ -181,15 +195,9 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     int cropSize = TF_OD_API_INPUT_SIZE;
 
-    /*
-    previewWidth = size.getWidth();
-    previewHeight = size.getHeight();
-    sensorOrientation = rotation - getScreenOrientation();
-    */
     previewWidth = 640;
     previewHeight = 480;
     sensorOrientation = 0;
-
 
     rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888);
     croppedBitmap = Bitmap.createBitmap(cropSize, cropSize, Bitmap.Config.ARGB_8888);
@@ -204,8 +212,27 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     frameToCropTransform.invert(cropToFrameTransform);
 
     objectDetection.getTracker().setFrameConfiguration(previewWidth, previewHeight, sensorOrientation);
+    context = this.getApplicationContext();
 
+    //viewGallery
+    viewGallery = (ImageButton)findViewById(R.id.viewGallery);
+    imagePaths = this.getApplicationContext().getFilesDir().list();
+    if (imagePaths.length > 0 && dimTemp != imagePaths.length) {
+      dimTemp = imagePaths.length;
+      try {
+        viewGallery.setImageBitmap(BitmapFactory.decodeStream(context.openFileInput(imagePaths[0])));
+      } catch (FileNotFoundException e) {
+        e.printStackTrace();
+      }
+    }
+    viewGallery.setOnClickListener(new View.OnClickListener() {
+      public void onClick(View v) {
+        isTakingPicture = true;
+        onViewGallery();
+      }
+    });
 
+    //takePicture
     takePicture = (ImageButton)findViewById(R.id.takePicture);
     takePicture.setOnClickListener(new View.OnClickListener() {
       public void onClick(View v) {
@@ -220,6 +247,14 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     render = new SampleRender(surfaceView, this, getAssets());
 
     installRequested = false;
+
+    runOnUiThread(
+            new Runnable() {
+              @Override
+              public void run() {
+
+              }
+            });
   }
 
 
@@ -520,6 +555,13 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     startActivityForResult(intent, 0);
   }
 
+  public void onViewGallery(){
+    if(intent == null) {
+      intent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
+    }
+    startActivityForResult(intent, 0);
+  }
+
   protected int getScreenOrientation() {
     switch (getWindowManager().getDefaultDisplay().getRotation()) {
       case Surface.ROTATION_270:
@@ -530,6 +572,13 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
         return 90;
       default:
         return 0;
+    }
+  }
+
+  protected synchronized void runInBackground(final Runnable r) {
+    Handler handler = null;
+    if (handler != null) {
+      handler.post(r);
     }
   }
 
