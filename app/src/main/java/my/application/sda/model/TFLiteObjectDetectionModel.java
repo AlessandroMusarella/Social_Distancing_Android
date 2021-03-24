@@ -40,7 +40,7 @@ import my.application.sda.detector.Detector;
 public class TFLiteObjectDetectionModel{
 
     /** Only return this many results. */
-    private static final int NUM_DETECTIONS = 10;
+    private static final int NUM_DETECTIONS = 50;
 
     private final MappedByteBuffer modelBuffer;
 

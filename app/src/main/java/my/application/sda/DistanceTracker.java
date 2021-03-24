@@ -8,7 +8,9 @@ import android.graphics.Path;
 import android.opengl.Matrix;
 import android.renderscript.Float3;
 
+import java.math.RoundingMode;
 import java.nio.FloatBuffer;
+import java.text.DecimalFormat;
 import java.util.List;
 
 import my.application.sda.detector.Detector;
@@ -49,10 +51,10 @@ public class DistanceTracker {
             paints[i].setColor(COLORS[i]);
             paints[i].setStyle(Paint.Style.STROKE);
             paints[i].setStrokeWidth(2.0f);
-            paints[i].setTextSize(12);
+            paints[i].setTextSize(18);
         }
-        path = new Path();
     }
+
 
     public Bitmap getTrackedBitmap (Bitmap currentFrame, List<Detector.Recognition> mappedRecognitions){
 
@@ -60,40 +62,58 @@ public class DistanceTracker {
         final Canvas canvas = new Canvas(resultBitmap);
 
         Float3[] coordinates = get3dCoordinates(mappedRecognitions);
-        Float3[] coordinatesOld = get3dCoordinatesOLD(mappedRecognitions);
+        //Float3[] coordinatesOld = get3dCoordinatesOLD(mappedRecognitions);
+
+        //formatting distance between persons
+        DecimalFormat df = new DecimalFormat("##.##");
+        df.setRoundingMode(RoundingMode.DOWN);
 
         for (int i = 0; i < mappedRecognitions.size(); i++) {
             float minDistance = Float.MAX_VALUE;
             int minJ = -1;
-            for (int j = 0; j < mappedRecognitions.size(); j++) {
-                if (i != j) {
-                    float tempDistance = getDistanceBetweenPeople(coordinates[i], coordinates[j]);
-                    float oldDistance = getDistanceBetweenPeople(coordinatesOld[i], coordinatesOld[j]);
-                    if (tempDistance < minDistance) {
-                        minDistance = tempDistance;
-                        minJ = j;
-                    }
+            for (int j = i + 1; j < mappedRecognitions.size(); j++) {
+                float tempDistance = getDistanceBetweenPeople(coordinates[i], coordinates[j]);
+                //float oldDistance = getDistanceBetweenPeople(coordinatesOld[i], coordinatesOld[j]);
+                if (tempDistance < minDistance) {
+                    minDistance = tempDistance;
+                    minJ = j;
                 }
             }
             if (minDistance > 2) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[GREEN]);
+                canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[GREEN]);
             } else if (minDistance > 1 && minDistance < 2){
+                path = new Path();
                 path.moveTo(mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY());
                 path.lineTo(mappedRecognitions.get(minJ).getLocation().centerX(), mappedRecognitions.get(minJ).getLocation().centerY());
+                float xi = mappedRecognitions.get(i).getLocation().centerX();
+                float xj = mappedRecognitions.get(minJ).getLocation().centerX();
+                float yi = mappedRecognitions.get(i).getLocation().centerY();
+                float yj = mappedRecognitions.get(minJ).getLocation().centerY();
+                float hOffset = (float) Math.sqrt(Math.pow(xi - xj, 2) + Math.pow(yi - yj, 2));
                 canvas.drawPath(path, paints[YELLOW]);
-                canvas.drawTextOnPath("" + minDistance, path, 3f, 1f, paints[YELLOW]);
+                canvas.drawTextOnPath(df.format(minDistance), path, hOffset, 2f, paints[YELLOW]);
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[YELLOW]);
+                canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[YELLOW]);
             }else if (minDistance < 1) {
+                path = new Path();
                 path.moveTo(mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY());
                 path.lineTo(mappedRecognitions.get(minJ).getLocation().centerX(), mappedRecognitions.get(minJ).getLocation().centerY());
+                float xi = mappedRecognitions.get(i).getLocation().centerX();
+                float xj = mappedRecognitions.get(minJ).getLocation().centerX();
+                float yi = mappedRecognitions.get(i).getLocation().centerY();
+                float yj = mappedRecognitions.get(minJ).getLocation().centerY();
+                float hOffset = (float) Math.sqrt(Math.pow(xi - xj, 2) + Math.pow(yi - yj, 2));
                 canvas.drawPath(path, paints[RED]);
-                canvas.drawTextOnPath("" + minDistance, path, 3f, 1f, paints[RED]);
+                canvas.drawTextOnPath(df.format(minDistance), path, hOffset, 2f, paints[RED]);
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[RED]);
+                canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[RED]);
             }
         }
 
         return resultBitmap;
     }
+
 
     public void setDepthMap(FloatBuffer depthMap, float scaleFactor, float shiftFactor){
         this.depthMap = depthMap;           //????????????????????????????????????

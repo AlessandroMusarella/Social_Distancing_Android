@@ -69,4 +69,12 @@
       android:layout_height="30dp"
       android:text="" />
 
+  <TextView
+      android:id="@+id/errorText"
+      android:layout_marginTop="280dp"
+      android:layout_marginLeft="170dp"
+      android:layout_width="600dp"
+      android:layout_height="40dp"
+      android:text="" />
+
 </RelativeLayout>

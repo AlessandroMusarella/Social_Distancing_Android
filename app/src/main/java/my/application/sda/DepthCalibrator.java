@@ -37,9 +37,9 @@ public class DepthCalibrator {
 
     // Calibrator
     private Calibrator calibrator;
-    final private int numberOfIterations = 100;
-    final private float normalizedThreshold = 0.1f;
-    final private float percentagePossibleInlier = 0.33f;
+    final private int numberOfIterations = 200;
+    final private float normalizedThreshold = 0.08f;
+    final private float percentagePossibleInlier = 0.3f;
 
     private float[] viewMatrix = new float[16];
     private float[] projectionMatrix = new float[16];

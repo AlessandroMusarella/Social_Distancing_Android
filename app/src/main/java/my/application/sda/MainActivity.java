@@ -20,19 +20,17 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Color;
 import android.graphics.Typeface;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.SystemClock;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Surface;
 import android.view.View;
-import android.widget.Button;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -65,7 +63,6 @@ import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationExceptio
 
 import my.application.sda.calibrator.Point;
 import my.application.sda.helpers.ImageUtil;
-import my.application.sda.model.TFLiteDepthModel;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -136,7 +133,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   //Button to see the picture saved in gallery
   private ImageButton viewGallery;
 
-  //text
+  //textView for notifications
+  private TextView textNotification;
+
+  //textView for errors
+  private TextView errorText;
 
   // temp
   DepthCalibrator depthCalibrator;
@@ -151,7 +152,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private static final int TF_OD_API_INPUT_SIZE = 300;
   private static final float TEXT_SIZE_DIP = 10;
   private static final boolean MAINTAIN_ASPECT = false;
-  private ObjectDetection objectDetection = new ObjectDetection();
+  private PersonDetection personDetection = new PersonDetection();
   private android.graphics.Matrix frameToCropTransform;
   private android.graphics.Matrix cropToFrameTransform;
   private int previewWidth, previewHeight;
@@ -166,7 +167,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
   private String[] imagePaths;
   private Context context;
-  private int dimTemp = 0;
+  private int dimPrec;
 
   /*
     Considerazioni generali:
@@ -187,11 +188,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
             TypedValue.applyDimension(
                     TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
     try {
-      objectDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE, textSizePx);
+      personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE, textSizePx);
     } catch (IOException e) {
       e.printStackTrace();
     }
-    objectDetection.getBorderedText().setTypeface(Typeface.MONOSPACE);
+    personDetection.getBorderedText().setTypeface(Typeface.MONOSPACE);
 
     int cropSize = TF_OD_API_INPUT_SIZE;
 
@@ -211,16 +212,17 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     cropToFrameTransform = new android.graphics.Matrix();
     frameToCropTransform.invert(cropToFrameTransform);
 
-    objectDetection.getTracker().setFrameConfiguration(previewWidth, previewHeight, sensorOrientation);
+    personDetection.getTracker().setFrameConfiguration(previewWidth, previewHeight, sensorOrientation);
     context = this.getApplicationContext();
 
     //viewGallery
     viewGallery = (ImageButton)findViewById(R.id.viewGallery);
     imagePaths = this.getApplicationContext().getFilesDir().list();
-    if (imagePaths.length > 0 && dimTemp != imagePaths.length) {
-      dimTemp = imagePaths.length;
+    Arrays.sort(imagePaths);
+    dimPrec = imagePaths.length;
+    if (imagePaths.length > 0) {
       try {
-        viewGallery.setImageBitmap(BitmapFactory.decodeStream(context.openFileInput(imagePaths[0])));
+        viewGallery.setImageBitmap(BitmapFactory.decodeStream(context.openFileInput(imagePaths[imagePaths.length - 1])));
       } catch (FileNotFoundException e) {
         e.printStackTrace();
       }
@@ -236,10 +238,30 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     takePicture = (ImageButton)findViewById(R.id.takePicture);
     takePicture.setOnClickListener(new View.OnClickListener() {
       public void onClick(View v) {
-        isTakingPicture = true;
-        onTakePicture();
+        if (currentPointCloud == null){
+          errorText.setTextColor(Color.RED);
+          errorText.setTextSize(25);
+          errorText.setText("Not enough feature points: move the device around");
+          new Handler().postDelayed(new Runnable(){
+            @Override
+            public void run()
+            {
+              errorText.setText("");
+            }
+          }, 5000);
+          return;
+        }else {
+          isTakingPicture = true;
+          onTakePicture();
+        }
       }
     });
+
+    //textNotification
+    textNotification = (TextView)findViewById(R.id.textNotification);
+
+    //errorText
+    errorText = (TextView)findViewById(R.id.errorText);
 
     displayRotationHelper = new DisplayRotationHelper(/*context=*/ this);
     
@@ -247,14 +269,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     render = new SampleRender(surfaceView, this, getAssets());
 
     installRequested = false;
-
-    runOnUiThread(
-            new Runnable() {
-              @Override
-              public void run() {
-
-              }
-            });
   }
 
 
@@ -339,6 +353,17 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       messageSnackbarHelper.showError(this, "Camera not available. Try restarting the app.");
       session = null;
       return;
+    }
+
+    imagePaths = context.getFilesDir().list();
+    Arrays.sort(imagePaths);
+    if (imagePaths.length > 0 && dimPrec != imagePaths.length) {
+      dimPrec = imagePaths.length;
+      try {
+        viewGallery.setImageBitmap(BitmapFactory.decodeStream(context.openFileInput(imagePaths[imagePaths.length - 1])));
+      } catch (FileNotFoundException e) {
+        e.printStackTrace();
+      }
     }
 
     surfaceView.onResume();
@@ -512,8 +537,13 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       render.draw(pointCloudMesh, pointCloudShader);
     }
 
-    // Compose the virtual scene with the background.
-    //backgroundRenderer.drawVirtualScene(render, virtualSceneFramebuffer, Z_NEAR, Z_FAR);
+    runOnUiThread(
+            new Runnable() {
+              @Override
+              public void run() {
+                textNotification.setText("Point Cloud: " + currentPointCloud.length);
+              }
+            });
   }
 
 
@@ -547,7 +577,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     distanceTracker.setCameraMatrix(viewMatrix, projectionMatrix, fx_d, fy_d, cx_d, cy_d);
     distanceTracker.setDepthMap(depthCalibrator.getDepthMap(), (float)depthCalibrator.getScaleFactor(), (float)depthCalibrator.getShiftFactor());
-    detectionBitmap = distanceTracker.getTrackedBitmap(currentFrameBitmap, objectDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform));
+    detectionBitmap = distanceTracker.getTrackedBitmap(currentFrameBitmap, personDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform));
 
     String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
     String depthFileName = "sda-"+timeStamp+"-1depth.jpg";

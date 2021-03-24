@@ -25,7 +25,7 @@ import my.application.sda.detector.MultiBoxTracker;
 import my.application.sda.model.TFLiteDepthModel;
 import my.application.sda.model.TFLiteObjectDetectionModel;
 
-public class ObjectDetection {
+public class PersonDetection {
 
     private TFLiteObjectDetectionModel ODModel;
     private MultiBoxTracker tracker;
@@ -37,7 +37,7 @@ public class ObjectDetection {
     private static final float MINIMUM_CONFIDENCE_TF_OD_API = 0.5f;
     private Size INPUT_SIZE = new Size(640, 480);
 
-    public ObjectDetection(){
+    public PersonDetection(){
         super();
     }
 
@@ -83,7 +83,6 @@ public class ObjectDetection {
                 mappedRecognitions.add(result);
             }
         }
-        //tracker.trackResults(mappedRecognitions);
 
         return Bitmap.createScaledBitmap(cropCopyBitmap, getINPUT_SIZE().getWidth(), getINPUT_SIZE().getHeight(), true);
 
@@ -108,7 +107,7 @@ public class ObjectDetection {
 
         for (final Detector.Recognition result : results) {
             final RectF location = result.getLocation();
-            if (location != null && result.getConfidence() >= minimumConfidence && result.getTitle().equals("cat")) {
+            if (location != null && result.getConfidence() >= minimumConfidence && result.getTitle().equals("person")) {
                 cropToFrameTransform.mapRect(location);
                 result.setLocation(location);
                 mappedRecognitions.add(result);
