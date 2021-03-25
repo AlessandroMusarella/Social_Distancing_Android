@@ -81,7 +81,8 @@ public class DistanceTracker {
             }
             if (minDistance > 2) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[GREEN]);
-                canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[GREEN]);
+                if (minJ >= 0)
+                    canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[GREEN]);
             } else if (minDistance > 1 && minDistance < 2){
                 path = new Path();
                 path.moveTo(mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY());
@@ -94,7 +95,8 @@ public class DistanceTracker {
                 canvas.drawPath(path, paints[YELLOW]);
                 canvas.drawTextOnPath(df.format(minDistance), path, hOffset, 2f, paints[YELLOW]);
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[YELLOW]);
-                canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[YELLOW]);
+                if (minJ >= 0)
+                    canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[YELLOW]);
             }else if (minDistance < 1) {
                 path = new Path();
                 path.moveTo(mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY());
@@ -107,7 +109,8 @@ public class DistanceTracker {
                 canvas.drawPath(path, paints[RED]);
                 canvas.drawTextOnPath(df.format(minDistance), path, hOffset, 2f, paints[RED]);
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[RED]);
-                canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[RED]);
+                if (minJ >= 0)
+                    canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[RED]);
             }
         }
 
