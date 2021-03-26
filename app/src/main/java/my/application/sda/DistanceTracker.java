@@ -5,13 +5,17 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.RectF;
 import android.opengl.Matrix;
 import android.renderscript.Float3;
 
 import java.math.RoundingMode;
 import java.nio.FloatBuffer;
 import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import my.application.sda.detector.Detector;
 
@@ -55,67 +59,76 @@ public class DistanceTracker {
         }
     }
 
-
     public Bitmap getTrackedBitmap (Bitmap currentFrame, List<Detector.Recognition> mappedRecognitions){
 
         Bitmap resultBitmap = currentFrame.copy(Bitmap.Config.ARGB_8888, true);
         final Canvas canvas = new Canvas(resultBitmap);
 
-        Float3[] coordinates = get3dCoordinates(mappedRecognitions);
+        Float3[] cordinates = get3dCoordinates(mappedRecognitions);
         //Float3[] coordinatesOld = get3dCoordinatesOLD(mappedRecognitions);
 
         //formatting distance between persons
         DecimalFormat df = new DecimalFormat("##.##");
         df.setRoundingMode(RoundingMode.DOWN);
 
+        List<DistanceBetween> distancesList = new ArrayList<DistanceBetween>();
+
+        //disegno i quadrati
         for (int i = 0; i < mappedRecognitions.size(); i++) {
             float minDistance = Float.MAX_VALUE;
             int minJ = -1;
-            for (int j = i + 1; j < mappedRecognitions.size(); j++) {
-                float tempDistance = getDistanceBetweenPeople(coordinates[i], coordinates[j]);
-                //float oldDistance = getDistanceBetweenPeople(coordinatesOld[i], coordinatesOld[j]);
-                if (tempDistance < minDistance) {
-                    minDistance = tempDistance;
-                    minJ = j;
+            for (int j = 0; j < mappedRecognitions.size(); j++) {
+                if (i != j) {
+                    float tempDistance = getDistanceBetweenPeople(cordinates[i], cordinates[j]);
+                    if (tempDistance < minDistance) {
+                        minDistance = tempDistance;
+                        minJ = j;
+                    }
                 }
             }
-            if (minDistance > 2) {
+            if (minDistance > 2)
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[GREEN]);
-                if (minJ >= 0)
-                    canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[GREEN]);
-            } else if (minDistance > 1 && minDistance < 2){
-                path = new Path();
-                path.moveTo(mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY());
-                path.lineTo(mappedRecognitions.get(minJ).getLocation().centerX(), mappedRecognitions.get(minJ).getLocation().centerY());
-                float xi = mappedRecognitions.get(i).getLocation().centerX();
-                float xj = mappedRecognitions.get(minJ).getLocation().centerX();
-                float yi = mappedRecognitions.get(i).getLocation().centerY();
-                float yj = mappedRecognitions.get(minJ).getLocation().centerY();
-                float hOffset = (float) Math.sqrt(Math.pow(xi - xj, 2) + Math.pow(yi - yj, 2));
-                canvas.drawPath(path, paints[YELLOW]);
-                canvas.drawTextOnPath(df.format(minDistance), path, hOffset, 2f, paints[YELLOW]);
+            else if (minDistance > 1 && minDistance < 2)
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[YELLOW]);
-                if (minJ >= 0)
-                    canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[YELLOW]);
-            }else if (minDistance < 1) {
-                path = new Path();
-                path.moveTo(mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY());
-                path.lineTo(mappedRecognitions.get(minJ).getLocation().centerX(), mappedRecognitions.get(minJ).getLocation().centerY());
-                float xi = mappedRecognitions.get(i).getLocation().centerX();
-                float xj = mappedRecognitions.get(minJ).getLocation().centerX();
-                float yi = mappedRecognitions.get(i).getLocation().centerY();
-                float yj = mappedRecognitions.get(minJ).getLocation().centerY();
-                float hOffset = (float) Math.sqrt(Math.pow(xi - xj, 2) + Math.pow(yi - yj, 2));
-                canvas.drawPath(path, paints[RED]);
-                canvas.drawTextOnPath(df.format(minDistance), path, hOffset, 2f, paints[RED]);
+            else if (minDistance < 1) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[RED]);
-                if (minJ >= 0)
-                    canvas.drawRect(mappedRecognitions.get(minJ).getLocation(), paints[RED]);
+            }
+            if (i < minJ){
+                distancesList.add(new DistanceBetween(mappedRecognitions.get(i).getLocation(), mappedRecognitions.get(minJ).getLocation(), minDistance));
             }
         }
 
+        for (DistanceBetween d : distancesList) {
+            if (d.location1.centerX() > d.location2.centerX()) {
+                RectF temp = d.location1;
+                d.location1 = d.location2;
+                d.location2 = temp;
+            }
+
+            float x1 = d.location1.centerX();
+            float x2 = d.location2.centerX();
+            float y1 = d.location1.centerY();
+            float y2 = d.location2.centerY();
+
+            if (d.distance >= 1 && d.distance < 2) {
+                path = new Path();
+                path.moveTo(x1, y1);
+                path.lineTo(x2, y2);
+                float hOffset = (float) Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2))/2f;
+                canvas.drawPath(path, paints[YELLOW]);
+                canvas.drawTextOnPath(df.format(d.distance), path, hOffset, 10f, paints[YELLOW]);
+            } else if (d.distance < 1) {
+                path = new Path();
+                path.moveTo(x1, y1);
+                path.lineTo(x2, y2);
+                float hOffset = (float) Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)) / 2f;
+                canvas.drawPath(path, paints[RED]);
+                canvas.drawTextOnPath(df.format(d.distance), path, hOffset, 10f, paints[RED]);
+            }
+        }
         return resultBitmap;
     }
+
 
 
     public void setDepthMap(FloatBuffer depthMap, float scaleFactor, float shiftFactor){
@@ -211,5 +224,16 @@ public class DistanceTracker {
 
     private Float getDistanceBetweenPeople(Float3 p1, Float3 p2){
         return (float) Math.sqrt(Math.pow(p1.x -p2.x, 2) + Math.pow(p1.x -p2.x, 2) + Math.pow(p1.x -p2.x, 2));
+    }
+}
+
+class DistanceBetween {
+    protected RectF location1, location2;
+    protected float distance;
+
+    public DistanceBetween(RectF location1, RectF location2, float distance){
+        this.distance = distance;
+        this.location1 = location1;
+        this.location2 = location2;
     }
 }
