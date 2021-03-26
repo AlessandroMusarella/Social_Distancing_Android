@@ -1,4 +1,4 @@
-package my.application.sda;
+package my.application.sda.detector;
 
 import android.content.Context;
 import android.graphics.Bitmap;

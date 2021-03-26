@@ -1,28 +1,20 @@
-package my.application.sda;
+package my.application.sda.calibrator;
 
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.media.Image;
 
-import com.google.ar.core.Frame;
-import com.google.ar.core.PointCloud;
-import com.google.ar.core.exceptions.NotYetAvailableException;
-
 import org.tensorflow.lite.DataType;
 import org.tensorflow.lite.support.common.ops.NormalizeOp;
 import org.tensorflow.lite.support.image.ImageProcessor;
 import org.tensorflow.lite.support.image.TensorImage;
 import org.tensorflow.lite.support.image.ops.ResizeOp;
-import org.tensorflow.lite.support.image.ops.ResizeWithCropOrPadOp;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 
-import my.application.sda.calibrator.Calibrator;
-import my.application.sda.calibrator.Point;
-import my.application.sda.helpers.ImageUtilsKt;
 import my.application.sda.model.TFLiteDepthModel;
 
 public class DepthCalibrator {
@@ -67,16 +59,9 @@ public class DepthCalibrator {
         calibrator = new Calibrator(viewWidth, viewHeight, model.depthWidth, model.depthHeight, numberOfIterations, normalizedThreshold, percentagePossibleInlier);
     }
 
-    public void doInference(Frame frame, Point[] pointCloud){
+    public void doInference(FrameContainer frameContainer){
 
-        // Acquire current image from camera
-        try {
-            image = frame.acquireCameraImage();
-        } catch (NotYetAvailableException e) {
-            e.printStackTrace();
-            return;
-        }
-        imageBitmap = ImageUtilsKt.yuvToBitmap(image);
+        imageBitmap = frameContainer.getImage();
 
         // Resize, crop and normalize via Tensorflow
         TensorImage tensorImage = new TensorImage();
@@ -103,19 +88,15 @@ public class DepthCalibrator {
         }
         normalizedOutput.rewind();
 
-        depthBitmap = Bitmap.createScaledBitmap(argbOutputBitmap, image.getWidth(), image.getHeight(), true);
+        depthBitmap = Bitmap.createScaledBitmap(argbOutputBitmap, imageBitmap.getWidth(), imageBitmap.getHeight(), true);
 
         // Calibrate depth map
-        frame.getCamera().getProjectionMatrix(projectionMatrix, 0, 0.05f, 100f);
-        frame.getCamera().getViewMatrix(viewMatrix, 0);
-        calibrator.setCalibrator(frame.getCamera().getPose(), projectionMatrix , viewMatrix);
-        calibrator.calibrate(normalizedOutput, pointCloud);
+        calibrator.setCalibrator(frameContainer.getCameraPose(), frameContainer.getProjectionMatrix() , frameContainer.getViewMatrix());
+        calibrator.calibrate(normalizedOutput, frameContainer.getPointCloud());
 
         scaleFactor = calibrator.getScaleFactor();
         shiftFactor = calibrator.getShiftFactor();
         depthMap = bufferFromBitmap(depthBitmap);
-
-        image.close();
     }
 
 

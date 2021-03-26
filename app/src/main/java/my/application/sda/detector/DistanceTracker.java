@@ -1,4 +1,4 @@
-package my.application.sda;
+package my.application.sda.detector;
 
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -13,11 +13,7 @@ import java.math.RoundingMode;
 import java.nio.FloatBuffer;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
-import my.application.sda.detector.Detector;
 
 public class DistanceTracker {
 

@@ -23,7 +23,7 @@ fun yuvToBitmap(image: Image): Bitmap{
 
     val baOutputStream = ByteArrayOutputStream()
     val yuvImage: YuvImage = YuvImage(nv21, ImageFormat.NV21, image.width, image.height, null)
-    yuvImage.compressToJpeg(Rect(0, 0, image.width, image.height), 75, baOutputStream)
+    yuvImage.compressToJpeg(Rect(0, 0, image.width, image.height), 100, baOutputStream)
     val byteForBitmap = baOutputStream.toByteArray()
     val bitmap = BitmapFactory.decodeByteArray(byteForBitmap, 0, byteForBitmap.size)
 

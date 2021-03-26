@@ -16,19 +16,18 @@
 
 package my.application.sda;
 
-import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.media.Image;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.Surface;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -55,14 +54,20 @@ import com.google.ar.core.examples.java.common.samplerender.Shader;
 import com.google.ar.core.examples.java.common.samplerender.VertexBuffer;
 import com.google.ar.core.examples.java.common.samplerender.arcore.BackgroundRenderer;
 import com.google.ar.core.exceptions.CameraNotAvailableException;
+import com.google.ar.core.exceptions.NotYetAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
+import my.application.sda.calibrator.DepthCalibrator;
+import my.application.sda.calibrator.FrameContainer;
 import my.application.sda.calibrator.Point;
+import my.application.sda.detector.DistanceTracker;
+import my.application.sda.detector.PersonDetection;
 import my.application.sda.helpers.ImageUtil;
+import my.application.sda.helpers.ImageUtilsKt;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -130,24 +135,24 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   // Button to take a picture and change screen
   private ImageButton takePicture;
 
-  //Button to see the picture saved in gallery
+  // Button to see the picture saved in gallery
   private ImageButton viewGallery;
+  private String[] imagePaths;
+  private int dimPrec;
 
-  //textView for notifications
+  // TextView for notifications
   private TextView textNotification;
 
-  //textView for errors
+  // TextView for errors
   private TextView errorText;
 
-  // temp
+  // Depth calibrating variables
   DepthCalibrator depthCalibrator;
-  Bitmap currentFrameBitmap;
-  Bitmap currentDepthBitmap;
-  Frame currentFrame;
+  FrameContainer frameContainer = new FrameContainer();
   Point[] currentPointCloud;
   boolean isTakingPicture = false;
 
-  //Object Detection variables
+  // Object Detection variables
   private static final String TF_OD_API_MODEL_FILE = "detect.tflite";
   private static final int TF_OD_API_INPUT_SIZE = 300;
   private static final float TEXT_SIZE_DIP = 10;
@@ -157,17 +162,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private android.graphics.Matrix cropToFrameTransform;
   private int previewWidth, previewHeight;
   private Integer sensorOrientation;
-  private Bitmap rgbFrameBitmap = null;
-  private Bitmap croppedBitmap = null;
-  private Bitmap cropCopyBitmap = null;
-  private Bitmap detectionBitmap = null;
 
-  //tracker
+  // Tracker
   private DistanceTracker distanceTracker = new DistanceTracker();
 
-  private String[] imagePaths;
-  private Context context;
-  private int dimPrec;
+
 
   /*
     Considerazioni generali:
@@ -200,9 +199,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     previewHeight = 480;
     sensorOrientation = 0;
 
-    rgbFrameBitmap = Bitmap.createBitmap(previewWidth, previewHeight, Bitmap.Config.ARGB_8888);
-    croppedBitmap = Bitmap.createBitmap(cropSize, cropSize, Bitmap.Config.ARGB_8888);
-
     frameToCropTransform =
             ImageUtil.getTransformationMatrix(
                     previewWidth, previewHeight,
@@ -213,7 +209,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     frameToCropTransform.invert(cropToFrameTransform);
 
     personDetection.getTracker().setFrameConfiguration(previewWidth, previewHeight, sensorOrientation);
-    context = this.getApplicationContext();
 
     //viewGallery
     viewGallery = (ImageButton)findViewById(R.id.viewGallery);
@@ -222,7 +217,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     dimPrec = imagePaths.length;
     if (imagePaths.length > 0) {
       try {
-        viewGallery.setImageBitmap(BitmapFactory.decodeStream(context.openFileInput(imagePaths[imagePaths.length - 1])));
+        viewGallery.setImageBitmap(BitmapFactory.decodeStream(this.getApplicationContext().openFileInput(imagePaths[imagePaths.length - 1])));
       } catch (FileNotFoundException e) {
         e.printStackTrace();
       }
@@ -238,9 +233,9 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     takePicture = (ImageButton)findViewById(R.id.takePicture);
     takePicture.setOnClickListener(new View.OnClickListener() {
       public void onClick(View v) {
-        if (currentPointCloud == null){
+        if (currentPointCloud == null || currentPointCloud.length == 0){
           errorText.setTextColor(Color.RED);
-          errorText.setTextSize(25);
+          errorText.setTextSize(20);
           errorText.setText("Not enough feature points: move the device around");
           new Handler().postDelayed(new Runnable(){
             @Override
@@ -355,12 +350,12 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       return;
     }
 
-    imagePaths = context.getFilesDir().list();
+    imagePaths = this.getApplicationContext().getFilesDir().list();
     Arrays.sort(imagePaths);
     if (imagePaths.length > 0 && dimPrec != imagePaths.length) {
       dimPrec = imagePaths.length;
       try {
-        viewGallery.setImageBitmap(BitmapFactory.decodeStream(context.openFileInput(imagePaths[imagePaths.length - 1])));
+        viewGallery.setImageBitmap(BitmapFactory.decodeStream(this.getApplicationContext().openFileInput(imagePaths[imagePaths.length - 1])));
       } catch (FileNotFoundException e) {
         e.printStackTrace();
       }
@@ -454,15 +449,9 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   @Override
   public void onDrawFrame(SampleRender render) {
 
-    if(isTakingPicture){
+    if (session == null || isTakingPicture) {
       return;
     }
-
-
-    if (session == null) {
-      return;
-    }
-
 
     // -- Manage ARCore Session
 
@@ -485,13 +474,36 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     Frame frame;
     try {
       frame = session.update();
-      currentFrame = frame;
     } catch (CameraNotAvailableException e) {
       Log.e(TAG, "Camera not available during onDrawFrame", e);
       messageSnackbarHelper.showError(this, "Camera not available. Try restarting the app.");
       return;
     }
     Camera camera = frame.getCamera();
+
+    // Save information about current frame on FrameContainer
+    try {
+      Image imageFrame = frame.acquireCameraImage();
+
+      Bitmap imageBitmap = ImageUtilsKt.yuvToBitmap(imageFrame);
+
+      float fx_d, fy_d, cx_d, cy_d;
+      float[] projectionMatrix = new float[16];
+      float[] viewMatrix = new float[16];
+      frame.getCamera().getProjectionMatrix(projectionMatrix, 0, Z_NEAR, Z_FAR);
+      frame.getCamera().getViewMatrix(viewMatrix, 0);
+
+      fx_d = frame.getCamera().getImageIntrinsics().getFocalLength()[0];
+      fy_d = frame.getCamera().getImageIntrinsics().getFocalLength()[1];
+      cx_d = frame.getCamera().getImageIntrinsics().getPrincipalPoint()[0];
+      cy_d = frame.getCamera().getImageIntrinsics().getPrincipalPoint()[1];
+
+      frameContainer.fill(imageBitmap, frame.getCamera().getPose(), projectionMatrix, viewMatrix, fx_d, fy_d, cx_d, cy_d);
+
+      imageFrame.close();
+    } catch (NotYetAvailableException e) {
+      e.printStackTrace();
+    }
 
 
     // BackgroundRenderer.updateDisplayGeometry must be called every frame to update the coordinates
@@ -531,6 +543,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
         pointCloudVertexBuffer.set(pointCloud.getPoints());
         lastPointCloudTimestamp = pointCloud.getTimestamp();
         currentPointCloud = Point.parsePointCloud(pointCloud);
+        frameContainer.setPointCloud(currentPointCloud);
       }
       Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
       pointCloudShader.setMat4("u_ModelViewProjection", modelViewProjectionMatrix);
@@ -559,25 +572,14 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       depthCalibrator = new DepthCalibrator(this.getApplicationContext(), this.surfaceView.getWidth(), this.surfaceView.getHeight());
     }
 
-    depthCalibrator.doInference(currentFrame, currentPointCloud);
+    depthCalibrator.doInference(frameContainer);
 
-    currentFrameBitmap = depthCalibrator.getImageBitmap();
-    currentDepthBitmap = depthCalibrator.getDepthBitmap();
+    Bitmap currentFrameBitmap = depthCalibrator.getImageBitmap();
+    Bitmap currentDepthBitmap = depthCalibrator.getDepthBitmap();
 
-    float[] viewMatrix = new float[16];
-    float[] projectionMatrix = new float[16];
-    currentFrame.getCamera().getProjectionMatrix(projectionMatrix, 0, 0.05f, 100f);
-    currentFrame.getCamera().getViewMatrix(viewMatrix, 0);
-    float fx_d, fy_d, cx_d, cy_d;
-    fx_d = currentFrame.getCamera().getImageIntrinsics().getFocalLength()[0];
-    fy_d = currentFrame.getCamera().getImageIntrinsics().getFocalLength()[1];
-    cx_d = currentFrame.getCamera().getImageIntrinsics().getPrincipalPoint()[0];
-    cy_d = currentFrame.getCamera().getImageIntrinsics().getPrincipalPoint()[1];
-
-
-    distanceTracker.setCameraMatrix(viewMatrix, projectionMatrix, fx_d, fy_d, cx_d, cy_d);
+    distanceTracker.setCameraMatrix(frameContainer.getViewMatrix(), frameContainer.getProjectionMatrix(), frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
     distanceTracker.setDepthMap(depthCalibrator.getDepthMap(), (float)depthCalibrator.getScaleFactor(), (float)depthCalibrator.getShiftFactor());
-    detectionBitmap = distanceTracker.getTrackedBitmap(currentFrameBitmap, personDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform));
+    Bitmap detectionBitmap = distanceTracker.getTrackedBitmap(currentFrameBitmap, personDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform));
 
     String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
     String depthFileName = "sda-"+timeStamp+"-1depth.jpg";
@@ -597,25 +599,4 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     }
     startActivityForResult(intent, 0);
   }
-
-  protected int getScreenOrientation() {
-    switch (getWindowManager().getDefaultDisplay().getRotation()) {
-      case Surface.ROTATION_270:
-        return 270;
-      case Surface.ROTATION_180:
-        return 180;
-      case Surface.ROTATION_90:
-        return 90;
-      default:
-        return 0;
-    }
-  }
-
-  protected synchronized void runInBackground(final Runnable r) {
-    Handler handler = null;
-    if (handler != null) {
-      handler.post(r);
-    }
-  }
-
 }

@@ -71,7 +71,7 @@ public class Calibrator {
     }
 
 
-    public void calibrate(FloatBuffer prediction, my.application.sda.calibrator.Point[] pointCloud){       // i punti sono da rilasciare alla fine con release???
+    public void calibrate(FloatBuffer prediction, my.application.sda.calibrator.Point[] pointCloud){
 
         int numPoints = pointCloud.length;
         float[] point = new float[4];
