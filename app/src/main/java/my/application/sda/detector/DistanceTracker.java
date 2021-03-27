@@ -8,6 +8,7 @@ import android.graphics.Path;
 import android.graphics.RectF;
 import android.opengl.Matrix;
 import android.renderscript.Float3;
+import android.renderscript.Float4;
 
 import java.math.RoundingMode;
 import java.nio.FloatBuffer;
@@ -60,7 +61,7 @@ public class DistanceTracker {
         Bitmap resultBitmap = currentFrame.copy(Bitmap.Config.ARGB_8888, true);
         final Canvas canvas = new Canvas(resultBitmap);
 
-        Float3[] cordinates = get3dCoordinates(mappedRecognitions);
+        Float4[] coordinates = get3dCoordinates(mappedRecognitions);
         //Float3[] coordinatesOld = get3dCoordinatesOLD(mappedRecognitions);
 
         //formatting distance between persons
@@ -75,19 +76,24 @@ public class DistanceTracker {
             int minJ = -1;
             for (int j = 0; j < mappedRecognitions.size(); j++) {
                 if (i != j) {
-                    float tempDistance = getDistanceBetweenPeople(cordinates[i], cordinates[j]);
+                    float tempDistance = getDistanceBetweenPeople(coordinates[i], coordinates[j]);
                     if (tempDistance < minDistance) {
                         minDistance = tempDistance;
                         minJ = j;
                     }
                 }
             }
-            if (minDistance > 2)
+            if (minDistance > 2) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[GREEN]);
-            else if (minDistance > 1 && minDistance < 2)
+                canvas.drawText(df.format(coordinates[i].w), mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY(), paints[GREEN]);
+            }
+            else if (minDistance > 1 && minDistance < 2) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[YELLOW]);
+                canvas.drawText(df.format(coordinates[i].w), mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY(), paints[YELLOW]);
+            }
             else if (minDistance < 1) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[RED]);
+                canvas.drawText(df.format(coordinates[i].w), mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY(), paints[RED]);
             }
             if (i < minJ){
                 distancesList.add(new DistanceBetween(mappedRecognitions.get(i).getLocation(), mappedRecognitions.get(minJ).getLocation(), minDistance));
@@ -120,6 +126,14 @@ public class DistanceTracker {
                 float hOffset = (float) Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2)) / 2f;
                 canvas.drawPath(path, paints[RED]);
                 canvas.drawTextOnPath(df.format(d.distance), path, hOffset, 10f, paints[RED]);
+            }
+            else if (d.distance >= 2){
+                path = new Path();
+                path.moveTo(x1, y1);
+                path.lineTo(x2, y2);
+                float hOffset = (float) Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2))/2f;
+                canvas.drawPath(path, paints[GREEN]);
+                canvas.drawTextOnPath(df.format(d.distance), path, hOffset, 10f, paints[GREEN]);
             }
         }
         return resultBitmap;
@@ -158,8 +172,8 @@ public class DistanceTracker {
         Matrix.invertM(inverse, 0, viewProj, 0);
 
         for(int i=0; i<mappedRecognitions.size(); i++){
-            int x_screen = (int) mappedRecognitions.get(i).getLocation().centerX(); //???????????????????????????????????
-            int y_screen = (int) mappedRecognitions.get(i).getLocation().centerY(); //???????????????????????????????????
+            int x_screen = (int) mappedRecognitions.get(i).getLocation().centerX();
+            int y_screen = (int) mappedRecognitions.get(i).getLocation().centerY();
             float x_norm = (2f*x_screen)/(float)width - 1f;
             float y_norm = 1f - (2f*y_screen)/(float)height;
 
@@ -186,40 +200,36 @@ public class DistanceTracker {
         return result;
     }
 
-    private Float3[] get3dCoordinates(List<Detector.Recognition> mappedRecognitions){
-        float A = projectionMatrix[10];
-        float B = projectionMatrix[11];
-        Float3[] result = new Float3[mappedRecognitions.size()];
-        float[] viewProj = new float[16];
-        float[] inverse = new float[16];
-        float[] position = new float[4];
+    // https://medium.com/yodayoda/from-depth-map-to-point-cloud-7473721d3f
+
+    private Float4[] get3dCoordinates(List<Detector.Recognition> mappedRecognitions){
+        Float4[] result = new Float4[mappedRecognitions.size()];
 
         width = 640;
         height = 480;
 
-        Matrix.multiplyMM(viewProj, 0, projectionMatrix, 0 , viewMatrix, 0);
-        Matrix.invertM(inverse, 0, viewProj, 0);
-
         for(int i=0; i<mappedRecognitions.size(); i++){
-            int x_screen = (int) mappedRecognitions.get(i).getLocation().centerX(); //???????????????????????????????????
-            int y_screen = (int) mappedRecognitions.get(i).getLocation().centerY(); //???????????????????????????????????
+            int u = (int) mappedRecognitions.get(i).getLocation().centerX();
+            int v = (int) mappedRecognitions.get(i).getLocation().centerY();
 
-            float depth = depthMap.get(y_screen*width + x_screen);  //disparity value, between [0,1]
+            float depth = depthMap.get(v*width + u);  //disparity value, between [0,1]
             depth = depth * scaleFactor + shiftFactor;
             depth = 1 / depth;  //distance from the camera measured in meters
 
-            position[0] = (x_screen - cx_d) * depth / fx_d;
-            position[1] = (y_screen - cy_d) * depth / fy_d;
-            position[2] = depth;
+            float x_over_z = (cx_d - u) / fx_d;
+            float y_over_z = (cy_d - v) / fy_d;
+            float z = (float) (depth / Math.sqrt(1. + Math.pow(x_over_z,2) + Math.pow(y_over_z,2)));
+            float x = x_over_z * z;
+            float y = y_over_z * z;
 
-            result[i] = new Float3(position[0], position[1], position[2]);
+            result[i] = new Float4(x, y, z, depth);
         }
 
         return result;
     }
 
-    private Float getDistanceBetweenPeople(Float3 p1, Float3 p2){
-        return (float) Math.sqrt(Math.pow(p1.x -p2.x, 2) + Math.pow(p1.x -p2.x, 2) + Math.pow(p1.x -p2.x, 2));
+    private Float getDistanceBetweenPeople(Float4 p1, Float4 p2){
+        return (float) Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2) + Math.pow(p1.z -p2.z, 2));
     }
 }
 
