@@ -23,7 +23,6 @@ public class DepthCalibrator {
     private ImageProcessor imageProcessor;
 
     // Current image
-    private Image image;
     private Bitmap imageBitmap;
     private Bitmap depthBitmap;
 
@@ -32,9 +31,6 @@ public class DepthCalibrator {
     final private int numberOfIterations = 200;
     final private float normalizedThreshold = 0.08f;
     final private float percentagePossibleInlier = 0.3f;
-
-    private float[] viewMatrix = new float[16];
-    private float[] projectionMatrix = new float[16];
 
     // Outputs
     private FloatBuffer depthMap;
@@ -49,8 +45,6 @@ public class DepthCalibrator {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        int temp = model.depthWidth*viewHeight/viewWidth;
 
         imageProcessor = new ImageProcessor.Builder().add(new ResizeOp(model.depthHeight, model.depthWidth, ResizeOp.ResizeMethod.BILINEAR))
                                                      .add(new NormalizeOp(0,255))

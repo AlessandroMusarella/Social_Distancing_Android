@@ -160,13 +160,14 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private PersonDetection personDetection = new PersonDetection();
   private android.graphics.Matrix frameToCropTransform;
   private android.graphics.Matrix cropToFrameTransform;
-  private int previewWidth, previewHeight;
+  private int imageWidth, imageHeight;
   private Integer sensorOrientation;
 
   // Tracker
   private DistanceTracker distanceTracker = new DistanceTracker();
 
-
+  // Used to switch between activities
+  Intent intent;
 
   /*
     Considerazioni generali:
@@ -174,7 +175,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     -> primo tentativo: utilizzare i nostri metodi già presenti dentro al progetto per la calibrator
    */
 
-  Intent intent;    // to switch between activities
+
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -182,7 +183,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     setContentView(R.layout.activity_main);
     surfaceView = findViewById(R.id.surfaceview);
 
-    //object detection code
+    // Object detection
     final float textSizePx =
             TypedValue.applyDimension(
                     TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
@@ -195,22 +196,22 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     int cropSize = TF_OD_API_INPUT_SIZE;
 
-    previewWidth = 640;
-    previewHeight = 480;
+    imageWidth = 640;
+    imageHeight = 480;
     sensorOrientation = 0;
 
     frameToCropTransform =
             ImageUtil.getTransformationMatrix(
-                    previewWidth, previewHeight,
+                    imageWidth, imageHeight,
                     cropSize, cropSize,
                     sensorOrientation, MAINTAIN_ASPECT);
 
     cropToFrameTransform = new android.graphics.Matrix();
     frameToCropTransform.invert(cropToFrameTransform);
 
-    personDetection.getTracker().setFrameConfiguration(previewWidth, previewHeight, sensorOrientation);
+    personDetection.getTracker().setFrameConfiguration(imageWidth, imageHeight, sensorOrientation);
 
-    //viewGallery
+    // ViewGallery ImageButton
     viewGallery = (ImageButton)findViewById(R.id.viewGallery);
     imagePaths = this.getApplicationContext().getFilesDir().list();
     Arrays.sort(imagePaths);
@@ -229,7 +230,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       }
     });
 
-    //takePicture
+    // TakePicture
     takePicture = (ImageButton)findViewById(R.id.takePicture);
     takePicture.setOnClickListener(new View.OnClickListener() {
       public void onClick(View v) {
@@ -252,10 +253,8 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       }
     });
 
-    //textNotification
+    // Text label
     textNotification = (TextView)findViewById(R.id.textNotification);
-
-    //errorText
     errorText = (TextView)findViewById(R.id.errorText);
 
     displayRotationHelper = new DisplayRotationHelper(/*context=*/ this);
@@ -569,7 +568,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
   private void onTakePicture(){
     if(depthCalibrator == null){
-      depthCalibrator = new DepthCalibrator(this.getApplicationContext(), this.surfaceView.getWidth(), this.surfaceView.getHeight());
+      depthCalibrator = new DepthCalibrator(this.getApplicationContext(), imageWidth, imageHeight);
     }
 
     depthCalibrator.doInference(frameContainer);
