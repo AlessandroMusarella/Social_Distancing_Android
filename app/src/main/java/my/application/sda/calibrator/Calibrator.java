@@ -88,7 +88,7 @@ public class Calibrator {
             Point screenPoint = CoordsUtils.worldToScreen(point, viewWidth, viewHeight, projectionMatrix, viewMatrix);
 
             // Clipping point outside screen
-            if(screenPoint.x >= viewWidth || screenPoint.y > viewHeight || screenPoint.x < 0 || screenPoint.y < 0) {
+            if(screenPoint.x >= viewWidth || screenPoint.y >= viewHeight || screenPoint.x < 0 || screenPoint.y < 0) {
                 continue;
             }
 

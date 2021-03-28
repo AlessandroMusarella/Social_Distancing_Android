@@ -68,12 +68,15 @@ import my.application.sda.detector.DistanceTracker;
 import my.application.sda.detector.PersonDetection;
 import my.application.sda.helpers.ImageUtil;
 import my.application.sda.helpers.ImageUtilsKt;
+import my.application.sda.helpers.Logger;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.List;
 
 /**
  * This is a simple example that shows how to create an augmented reality (AR) application using the
@@ -166,16 +169,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   // Tracker
   private DistanceTracker distanceTracker = new DistanceTracker();
 
-  // Used to switch between activities
-  Intent intent;
-
-  /*
-    Considerazioni generali:
-    molti di queste variabili all'interno di TFL Object Detection vengono inizializzate dentro onPreviewSizeChosen(final Size size, final int rotation)
-    -> primo tentativo: utilizzare i nostri metodi già presenti dentro al progetto per la calibrator
-   */
+  // Logger
+  private Logger logger;
 
 
+  Intent intent;    // to switch between activities
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -183,7 +181,10 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     setContentView(R.layout.activity_main);
     surfaceView = findViewById(R.id.surfaceview);
 
-    // Object detection
+    logger = new Logger(this.getApplicationContext());
+    logger.addRecordToLog("onCreate: init logger");
+
+    //object detection code
     final float textSizePx =
             TypedValue.applyDimension(
                     TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
@@ -191,6 +192,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE, textSizePx);
     } catch (IOException e) {
       e.printStackTrace();
+      logger.addRecordToLog("onCreate: " + e.toString());
     }
     personDetection.getBorderedText().setTypeface(Typeface.MONOSPACE);
 
@@ -214,6 +216,13 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     // ViewGallery ImageButton
     viewGallery = (ImageButton)findViewById(R.id.viewGallery);
     imagePaths = this.getApplicationContext().getFilesDir().list();
+    String [] temp = new String[imagePaths.length - 1];
+    int cont = 0;
+    for (int i = 0; i < imagePaths.length; i++){
+      if (!imagePaths[i].equals(Logger.FILENAME))
+        temp[cont++] = imagePaths[i];
+    }
+    imagePaths = temp;
     Arrays.sort(imagePaths);
     dimPrec = imagePaths.length;
     if (imagePaths.length > 0) {
@@ -221,12 +230,27 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
         viewGallery.setImageBitmap(BitmapFactory.decodeStream(this.getApplicationContext().openFileInput(imagePaths[imagePaths.length - 1])));
       } catch (FileNotFoundException e) {
         e.printStackTrace();
+        logger.addRecordToLog("onCreate: " + e.toString());
       }
     }
     viewGallery.setOnClickListener(new View.OnClickListener() {
       public void onClick(View v) {
-        isTakingPicture = true;
-        onViewGallery();
+        if (imagePaths.length == 0 || imagePaths.length == 1){
+          errorText.setTextColor(Color.WHITE);
+          errorText.setTextSize(20);
+          errorText.setText("No image available");
+          new Handler().postDelayed(new Runnable(){
+            @Override
+            public void run()
+            {
+              errorText.setText("");
+            }
+          }, 3000);
+          return;
+        }else {
+          isTakingPicture = true;
+          onViewGallery();
+        }
       }
     });
 
@@ -258,7 +282,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     errorText = (TextView)findViewById(R.id.errorText);
 
     displayRotationHelper = new DisplayRotationHelper(/*context=*/ this);
-    
+
     // Set up renderer.
     render = new SampleRender(surfaceView, this, getAssets());
 
@@ -309,7 +333,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
         // Create the session.
         session = new Session(/* context= */ this);
       } catch (UnavailableArcoreNotInstalledException
-          | UnavailableUserDeclinedInstallationException e) {
+              | UnavailableUserDeclinedInstallationException e) {
         message = "Please install ARCore";
         exception = e;
       } catch (UnavailableApkTooOldException e) {
@@ -328,7 +352,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
       if (message != null) {
         messageSnackbarHelper.showError(this, message);
-        Log.e(TAG, "Exception creating session", exception);
+        logger.addRecordToLog("onResume: " + message.toString());
         return;
       }
     }
@@ -345,11 +369,19 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       session.resume();
     } catch (CameraNotAvailableException e) {
       messageSnackbarHelper.showError(this, "Camera not available. Try restarting the app.");
+      logger.addRecordToLog("onResume: Camera not available. Try restarting the app" );
       session = null;
       return;
     }
 
     imagePaths = this.getApplicationContext().getFilesDir().list();
+    String [] temp = new String[imagePaths.length - 1];
+    int cont = 0;
+    for (int i = 0; i < imagePaths.length; i++){
+      if (!imagePaths[i].equals(Logger.FILENAME))
+        temp[cont++] = imagePaths[i];
+    }
+    imagePaths = temp;
     Arrays.sort(imagePaths);
     if (imagePaths.length > 0 && dimPrec != imagePaths.length) {
       dimPrec = imagePaths.length;
@@ -383,7 +415,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     if (!CameraPermissionHelper.hasCameraPermission(this)) {
       // Use toast instead of snackbar here since the activity will exit.
       Toast.makeText(this, "Camera permission is needed to run this application", Toast.LENGTH_LONG)
-          .show();
+              .show();
       if (!CameraPermissionHelper.shouldShowRequestPermissionRationale(this)) {
         // Permission denied with checking "Do not ask again".
         CameraPermissionHelper.launchPermissionSettings(this);
@@ -412,29 +444,29 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
                 render, false);
         backgroundRenderer.setUseOcclusion(render, false);
       } catch (IOException e) {
-        Log.e(TAG, "Failed to read a required asset file", e);
+        logger.addRecordToLog("onSurfaceCreated: Failed to read a required asset file\n" + e.toString());
         messageSnackbarHelper.showError(this, "Failed to read a required asset file: " + e);
         return;
       }
 
       // Point cloud
       pointCloudShader =
-          Shader.createFromAssets(
-                  render, "shaders/point_cloud.vert", "shaders/point_cloud.frag", /*defines=*/ null)
-              .setVec4(
-                  "u_Color", new float[] {31.0f / 255.0f, 188.0f / 255.0f, 210.0f / 255.0f, 1.0f})
-              .setFloat("u_PointSize", 5.0f);
+              Shader.createFromAssets(
+                      render, "shaders/point_cloud.vert", "shaders/point_cloud.frag", /*defines=*/ null)
+                      .setVec4(
+                              "u_Color", new float[] {31.0f / 255.0f, 188.0f / 255.0f, 210.0f / 255.0f, 1.0f})
+                      .setFloat("u_PointSize", 5.0f);
       // four entries per vertex: X, Y, Z, confidence
       pointCloudVertexBuffer =
-          new VertexBuffer(render, /*numberOfEntriesPerVertex=*/ 4, /*entries=*/ null);
+              new VertexBuffer(render, /*numberOfEntriesPerVertex=*/ 4, /*entries=*/ null);
       final VertexBuffer[] pointCloudVertexBuffers = {pointCloudVertexBuffer};
       pointCloudMesh =
-          new Mesh(
-              render, Mesh.PrimitiveMode.POINTS, /*indexBuffer=*/ null, pointCloudVertexBuffers);
+              new Mesh(
+                      render, Mesh.PrimitiveMode.POINTS, /*indexBuffer=*/ null, pointCloudVertexBuffers);
 
 
     } catch (IOException e) {
-      Log.e(TAG, "Failed to read a required asset file", e);
+      logger.addRecordToLog("onSurfaceCreated: Failed to read a required asset file\n" + e.toString());
       messageSnackbarHelper.showError(this, "Failed to read a required asset file: " + e);
     }
   }
@@ -448,7 +480,12 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   @Override
   public void onDrawFrame(SampleRender render) {
 
-    if (session == null || isTakingPicture) {
+    if (isTakingPicture){
+      return;
+    }
+
+    if (session == null) {
+      logger.addRecordToLog("onDrawFrame: session is null");
       return;
     }
 
@@ -459,7 +496,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     // initialized during the execution of onSurfaceCreated.
     if (!hasSetTextureNames) {
       session.setCameraTextureNames(
-          new int[] {backgroundRenderer.getCameraColorTexture().getTextureId()});
+              new int[] {backgroundRenderer.getCameraColorTexture().getTextureId()});
       hasSetTextureNames = true;
     }
 
@@ -474,7 +511,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     try {
       frame = session.update();
     } catch (CameraNotAvailableException e) {
-      Log.e(TAG, "Camera not available during onDrawFrame", e);
+      logger.addRecordToLog("onDrawFrame: Camera not available during onDrawFrame\n" + e.toString());
       messageSnackbarHelper.showError(this, "Camera not available. Try restarting the app.");
       return;
     }
@@ -502,6 +539,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       imageFrame.close();
     } catch (NotYetAvailableException e) {
       e.printStackTrace();
+      //logger.addRecordToLog("onDrawFrame: " + e.toString());
     }
 
 
