@@ -30,7 +30,7 @@ public class DistanceTracker {
     private float scaleFactor;
     private float shiftFactor;
 
-    //tracker
+    // Tracker
     private static final int[] COLORS = {
             Color.RED,
             Color.GREEN,
@@ -95,8 +95,8 @@ public class DistanceTracker {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[RED]);
                 canvas.drawText(df.format(coordinates[i].w), mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY(), paints[RED]);
             }
-            if (i < minJ){
-                distancesList.add(new DistanceBetween(mappedRecognitions.get(i).getLocation(), mappedRecognitions.get(minJ).getLocation(), minDistance));
+            if (i < minJ || !isPresent(i, distancesList)){
+                distancesList.add(new DistanceBetween(i, minJ, mappedRecognitions.get(i).getLocation(), mappedRecognitions.get(minJ).getLocation(), minDistance));
             }
         }
 
@@ -127,18 +127,25 @@ public class DistanceTracker {
                 canvas.drawPath(path, paints[RED]);
                 canvas.drawTextOnPath(df.format(d.distance), path, hOffset, 10f, paints[RED]);
             }
-            else if (d.distance >= 2){
+            /* else if (d.distance >= 2){
                 path = new Path();
                 path.moveTo(x1, y1);
                 path.lineTo(x2, y2);
                 float hOffset = (float) Math.sqrt(Math.pow(x1 - x2, 2) + Math.pow(y1 - y2, 2))/2f;
                 canvas.drawPath(path, paints[GREEN]);
                 canvas.drawTextOnPath(df.format(d.distance), path, hOffset, 10f, paints[GREEN]);
-            }
+            }*/
         }
         return resultBitmap;
     }
 
+    private boolean isPresent(int person, List<DistanceBetween> distancesList) {
+        for (DistanceBetween d : distancesList){
+            if (person == d.person1 || person == d.person2)
+                return true;
+        }
+        return false;
+    }
 
 
     public void setDepthMap(FloatBuffer depthMap, float scaleFactor, float shiftFactor){
@@ -236,10 +243,21 @@ public class DistanceTracker {
 class DistanceBetween {
     protected RectF location1, location2;
     protected float distance;
+    protected int person1, person2;
 
-    public DistanceBetween(RectF location1, RectF location2, float distance){
+    public DistanceBetween(int person1, int person2, RectF location1, RectF location2, float distance){
         this.distance = distance;
         this.location1 = location1;
         this.location2 = location2;
+        this.person1 = person1;
+        this.person2 = person2;
+    }
+
+    public int getPerson1() {
+        return person1;
+    }
+
+    public int getPerson2() {
+        return person2;
     }
 }
