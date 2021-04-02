@@ -40,7 +40,7 @@ import my.application.sda.detector.Detector;
 public class TFLiteObjectDetectionModel{
 
     /** Only return this many results. */
-    private static final int NUM_DETECTIONS = 50;
+    private static final int NUM_DETECTIONS = 25;
 
     private final MappedByteBuffer modelBuffer;
 
@@ -49,19 +49,6 @@ public class TFLiteObjectDetectionModel{
 
     /** Builder of the options used to config the ObjectDetector. */
     private final ObjectDetectorOptions.Builder optionsBuilder;
-
-    /**
-     * Initializes a native TensorFlow session for classifying images.
-     *
-     * <p>{@code labelFilename}, {@code inputSize}, and {@code isQuantized}, are NOT required, but to
-     * keep consistency with the implementation using the TFLite Interpreter Java API. See <a
-     * href="https://github.com/tensorflow/examples/blob/master/lite/examples/object_detection/android/lib_interpreter/src/main/java/org/tensorflow/lite/examples/detection/tflite/TFLiteObjectDetectionAPIModel.java">lib_interpreter</a>.
-     *
-     * @param modelFilename The model file path relative to the assets folder
-     * @param labelFilename The label file path relative to the assets folder
-     * @param inputSize The size of image input
-     * @param isQuantized Boolean representing model is quantized or not
-     */
 
     public TFLiteObjectDetectionModel(Context context, String modelFilename) throws IOException {
         modelBuffer = FileUtil.loadMappedFile(context, modelFilename);

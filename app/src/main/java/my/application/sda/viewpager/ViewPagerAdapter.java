@@ -39,11 +39,17 @@ public class ViewPagerAdapter extends PagerAdapter {
     public ViewPagerAdapter(Context context) {
         this.context = context;
         this.imagePaths = context.getFilesDir().list();
-        String [] temp = new String[imagePaths.length - 1];
         int cont = 0;
         for (int i = 0; i < imagePaths.length; i++){
-            if (!imagePaths[i].equals(Logger.FILENAME))
+            if (imagePaths[i].contains(".jpg"))
+                cont++;
+        }
+        String [] temp = new String[cont];
+        cont=0;
+        for(int i=0; i < imagePaths.length; i++){
+            if (imagePaths[i].contains(".jpg")) {
                 temp[cont++] = imagePaths[i];
+            }
         }
         imagePaths = temp;
         Arrays.sort(imagePaths);

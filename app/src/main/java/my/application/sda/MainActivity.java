@@ -16,6 +16,7 @@
 
 package my.application.sda;
 
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -26,7 +27,6 @@ import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.Log;
 import android.util.TypedValue;
 import android.view.View;
 import android.widget.ImageButton;
@@ -35,6 +35,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.Camera;
 import com.google.ar.core.Config;
@@ -61,9 +62,14 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import my.application.sda.calibrator.DepthCalibrator;
 import my.application.sda.calibrator.FrameContainer;
 import my.application.sda.calibrator.Point;
+import my.application.sda.detector.Detector;
 import my.application.sda.detector.DistanceTracker;
 import my.application.sda.detector.PersonDetection;
 import my.application.sda.helpers.ImageUtil;
@@ -71,12 +77,15 @@ import my.application.sda.helpers.ImageUtilsKt;
 import my.application.sda.helpers.Logger;
 
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This is a simple example that shows how to create an augmented reality (AR) application using the
@@ -216,11 +225,17 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     // ViewGallery ImageButton
     viewGallery = (ImageButton)findViewById(R.id.viewGallery);
     imagePaths = this.getApplicationContext().getFilesDir().list();
-    String [] temp = new String[imagePaths.length - 1];
     int cont = 0;
     for (int i = 0; i < imagePaths.length; i++){
-      if (!imagePaths[i].equals(Logger.FILENAME))
+      if (imagePaths[i].contains(".jpg"))
+        cont++;
+    }
+    String [] temp = new String[cont];
+    cont=0;
+    for(int i=0; i < imagePaths.length; i++){
+      if (imagePaths[i].contains(".jpg")) {
         temp[cont++] = imagePaths[i];
+      }
     }
     imagePaths = temp;
     Arrays.sort(imagePaths);
@@ -375,11 +390,17 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     }
 
     imagePaths = this.getApplicationContext().getFilesDir().list();
-    String [] temp = new String[imagePaths.length - 1];
     int cont = 0;
     for (int i = 0; i < imagePaths.length; i++){
-      if (!imagePaths[i].equals(Logger.FILENAME))
+      if (imagePaths[i].contains(".jpg"))
+        cont++;
+    }
+    String [] temp = new String[cont];
+    cont=0;
+    for(int i=0; i < imagePaths.length; i++){
+      if (imagePaths[i].contains(".jpg")) {
         temp[cont++] = imagePaths[i];
+      }
     }
     imagePaths = temp;
     Arrays.sort(imagePaths);
@@ -542,14 +563,12 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       //logger.addRecordToLog("onDrawFrame: " + e.toString());
     }
 
-
     // BackgroundRenderer.updateDisplayGeometry must be called every frame to update the coordinates
     // used to draw the background camera image.
     backgroundRenderer.updateDisplayGeometry(frame);
 
     // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
     trackingStateHelper.updateKeepScreenOnFlag(camera.getTrackingState());
-
 
     // -- Draw background
 
@@ -563,7 +582,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     if (camera.getTrackingState() == TrackingState.PAUSED) {
       return;
     }
-
 
     // -- Draw non-occluded virtual objects (planes, point cloud)
 
@@ -596,7 +614,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
             });
   }
 
-
   /** Configures the session with feature settings. */
   private void configureSession() {
     Config config = session.getConfig();
@@ -614,15 +631,20 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     Bitmap currentFrameBitmap = depthCalibrator.getImageBitmap();
     Bitmap currentDepthBitmap = depthCalibrator.getDepthBitmap();
 
-    distanceTracker.setCameraMatrix(frameContainer.getViewMatrix(), frameContainer.getProjectionMatrix(), frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
+    distanceTracker.setCameraParameters(frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
     distanceTracker.setDepthMap(depthCalibrator.getDepthMap(), (float)depthCalibrator.getScaleFactor(), (float)depthCalibrator.getShiftFactor());
     Bitmap detectionBitmap = distanceTracker.getTrackedBitmap(currentFrameBitmap, personDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform));
 
     String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
-    String depthFileName = "sda-"+timeStamp+"-1depth.jpg";
-    String detectionFileName = "sda-"+timeStamp+"-2detection.jpg";
+    String imageFileName = "sda-" + timeStamp + "-0image.jpg";
+    String depthFileName = "sda-" + timeStamp + "-1depth.jpg";
+    String detectionFileName = "sda-" + timeStamp + "-2detection.jpg";
+    String JSONFileName = "sda-" + timeStamp + ".json";
     ImageUtil.createImageFromBitmap(currentDepthBitmap, depthFileName, surfaceView.getContext());
     ImageUtil.createImageFromBitmap(detectionBitmap, detectionFileName, surfaceView.getContext());
+    ImageUtil.createImageFromBitmap(frameContainer.getImage(), imageFileName, surfaceView.getContext());
+
+    writeJsonFile(distanceTracker, depthFileName, imageFileName, JSONFileName, personDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform), (float) depthCalibrator.getScaleFactor(), (float) depthCalibrator.getShiftFactor(), frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
 
     if(intent == null) {
       intent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
@@ -635,5 +657,45 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       intent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
     }
     startActivityForResult(intent, 0);
+  }
+
+  public void writeJsonFile(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d) {
+    JSONObject sampleObject = new JSONObject();
+    JSONObject sampleObject1 = new JSONObject();
+    try {
+      sampleObject.put("fileDepth", depthFileName);
+      sampleObject.put("imageFileName", imageFileName);
+      sampleObject.put("scale_factor", scale_factor);
+      sampleObject.put("shift_factor", shift_factor);
+      sampleObject.put("fx_d", fx_d);
+      sampleObject.put("fy_d", fy_d);
+      sampleObject.put("cx_d", cx_d);
+      sampleObject.put("cy_d", cy_d);
+
+      List<Map> finalMap = new ArrayList<>();
+      List<String> colored_shapes = distanceTracker.getColored_shapes();
+      int cont_pers = 0;
+      for (Detector.Recognition r : mappedRecognitions){
+        Map<String, String> recognitions = new HashMap<>();
+        recognitions.put("person_" + cont_pers + "_rectf_bottom", r.getLocation().bottom + "");
+        recognitions.put("person_" + cont_pers + "_rectf_top", r.getLocation().top + "");
+        recognitions.put("person_" + cont_pers + "_rectf_left", r.getLocation().left + "");
+        recognitions.put("person_" + cont_pers + "_rectf_right", r.getLocation().right + "");
+        recognitions.put("person_" + cont_pers + "_color", colored_shapes.get(cont_pers));
+        cont_pers++;
+        finalMap.add(recognitions);
+      }
+      sampleObject.put("detections", new ObjectMapper().writeValueAsString(finalMap));
+
+      FileOutputStream fos = this.getApplicationContext().openFileOutput(filename, Context.MODE_PRIVATE);
+      String finalMessage = sampleObject.toString();
+      fos.write(finalMessage.getBytes());
+      fos.flush();
+      fos.close();
+    } catch (JSONException | FileNotFoundException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 }
