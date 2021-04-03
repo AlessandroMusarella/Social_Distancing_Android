@@ -677,12 +677,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       int cont_pers = 0;
       for (Detector.Recognition r : mappedRecognitions){
         Map<String, String> recognitions = new HashMap<>();
-        recognitions.put("person_" + cont_pers + "_rectf_bottom", r.getLocation().bottom + "");
-        recognitions.put("person_" + cont_pers + "_rectf_top", r.getLocation().top + "");
-        recognitions.put("person_" + cont_pers + "_rectf_left", r.getLocation().left + "");
-        recognitions.put("person_" + cont_pers + "_rectf_right", r.getLocation().right + "");
-        recognitions.put("person_" + cont_pers + "_color", colored_shapes.get(cont_pers));
-        cont_pers++;
+        recognitions.put("rectf_bottom", r.getLocation().bottom + "");
+        recognitions.put("rectf_top", r.getLocation().top + "");
+        recognitions.put("rectf_left", r.getLocation().left + "");
+        recognitions.put("rectf_right", r.getLocation().right + "");
+        recognitions.put("color", colored_shapes.get(cont_pers++));
         finalMap.add(recognitions);
       }
       sampleObject.put("detections", new ObjectMapper().writeValueAsString(finalMap));
