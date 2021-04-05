@@ -90,20 +90,25 @@ public class DistanceTracker {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[GREEN]);
                 canvas.drawText(df.format(coordinates[i].w), mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY(), paints[GREEN]);
                 colored_shapes.add("GREEN");
-            }
-            else if (minDistance > 1 && minDistance < 2) {
+            } else if (minDistance > 1 && minDistance < 2) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[YELLOW]);
                 canvas.drawText(df.format(coordinates[i].w), mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY(), paints[YELLOW]);
                 colored_shapes.add("YELLOW");
-            }
-            else if (minDistance < 1) {
+            } else if (minDistance < 1) {
                 canvas.drawRect(mappedRecognitions.get(i).getLocation(), paints[RED]);
                 canvas.drawText(df.format(coordinates[i].w), mappedRecognitions.get(i).getLocation().centerX(), mappedRecognitions.get(i).getLocation().centerY(), paints[RED]);
                 colored_shapes.add("RED");
             }
-            if (i < minJ || !isPresent(i, distancesList)){
-                if (minJ > 0)
-                    distancesList.add(new DistanceBetween(i, minJ, mappedRecognitions.get(i).getLocation(), mappedRecognitions.get(minJ).getLocation(), minDistance));
+
+            if (minJ >= 0){
+                DistanceBetween distance = new DistanceBetween(i, minJ, mappedRecognitions.get(i).getLocation(), mappedRecognitions.get(minJ).getLocation(), minDistance);
+                boolean contains = false;
+                for (DistanceBetween d : distancesList) {
+                    if (distance.equals(d))
+                        contains = true;
+                }
+                if (!contains)
+                    distancesList.add(distance);
             }
         }
 
@@ -138,15 +143,6 @@ public class DistanceTracker {
         }
         return resultBitmap;
     }
-
-    private boolean isPresent(int person, List<DistanceBetween> distancesList) {
-        for (DistanceBetween d : distancesList){
-            if (person == d.person1 || person == d.person2)
-                return true;
-        }
-        return false;
-    }
-
 
     public void setDepthMap(FloatBuffer depthMap, float scaleFactor, float shiftFactor){
         this.depthMap = depthMap;
@@ -209,5 +205,12 @@ class DistanceBetween {
         this.location2 = location2;
         this.person1 = person1;
         this.person2 = person2;
+    }
+
+    public boolean equals(DistanceBetween d){
+        if((this.person1 == d.person1 && this.person2 == d.person2) || (this.person1 == d.person2 && this.person2 == d.person1)){
+            return true;
+        }
+        else return false;
     }
 }
