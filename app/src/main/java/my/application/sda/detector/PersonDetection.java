@@ -91,7 +91,7 @@ public class PersonDetection {
     public List<Detector.Recognition> getRecognitionsTrackedfrom(Bitmap currentFrameBitmap, Matrix cropToFrameTransform){
 
         currentFrameBitmap = currentFrameBitmap.copy(Bitmap.Config.ARGB_8888, true);
-        croppedBitmap = Bitmap.createScaledBitmap(currentFrameBitmap, 300, 300, true);
+        croppedBitmap = Bitmap.createScaledBitmap(currentFrameBitmap, 320, 320, true);
 
         final List<Detector.Recognition> results = getODModel().recognizeImage(croppedBitmap);
 

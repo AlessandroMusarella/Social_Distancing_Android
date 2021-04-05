@@ -165,8 +165,8 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   boolean isTakingPicture = false;
 
   // Object Detection variables
-  private static final String TF_OD_API_MODEL_FILE = "detect.tflite";
-  private static final int TF_OD_API_INPUT_SIZE = 300;
+  private static final String TF_OD_API_MODEL_FILE = "efficientNet.tflite";
+  private static final int TF_OD_API_INPUT_SIZE = 320;
   private static final float TEXT_SIZE_DIP = 10;
   private static final boolean MAINTAIN_ASPECT = false;
   private PersonDetection personDetection = new PersonDetection();
