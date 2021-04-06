@@ -31,4 +31,13 @@
     <item>Enable Instant Placement</item>
   </string-array>
 
+  <string translatable="false" name="efficientDet0_label">efficientDet0</string>
+  <string translatable="false" name="efficientDet2_label">efficientDet2</string>
+  <string translatable="false" name="efficientDet4_label">efficientDet4</string>
+
+  <string translatable="false" name="efficientDet0_fileName">efficientDet0.tflite</string>
+  <string translatable="false" name="efficientDet2_fileName">efficientDet2.tflite</string>
+  <string translatable="false" name="efficientDet4_fileName">efficientDet4.tflite</string>
+
+
 </resources>

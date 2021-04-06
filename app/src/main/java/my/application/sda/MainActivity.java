@@ -18,6 +18,7 @@ package my.application.sda;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -62,7 +63,6 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -158,6 +158,9 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   // TextView for errors
   private TextView errorText;
 
+  // Button to open settings
+  private ImageButton settingButton;
+
   // Depth calibrating variables
   DepthCalibrator depthCalibrator;
   FrameContainer frameContainer = new FrameContainer();
@@ -165,8 +168,12 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   boolean isTakingPicture = false;
 
   // Object Detection variables
-  private static final String TF_OD_API_MODEL_FILE = "efficientNet.tflite";
-  private static final int TF_OD_API_INPUT_SIZE = 320;
+  private static final String TF_OD_API_MODEL_FILE_0 = "efficientDet0.tflite";
+  private static final String TF_OD_API_MODEL_FILE_2 = "efficientDet2.tflite";
+  private static final String TF_OD_API_MODEL_FILE_4 = "efficientDet4.tflite";
+  private static final int TF_OD_API_INPUT_SIZE_0 = 320;
+  private static final int TF_OD_API_INPUT_SIZE_2 = 448;
+  private static final int TF_OD_API_INPUT_SIZE_4 = 512;
   private static final float TEXT_SIZE_DIP = 10;
   private static final boolean MAINTAIN_ASPECT = false;
   private PersonDetection personDetection = new PersonDetection();
@@ -181,8 +188,12 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   // Logger
   private Logger logger;
 
+  // To switch between activities
+  Intent galleryIntent;
+  Intent settingIntent;
 
-  Intent intent;    // to switch between activities
+  //Shared preferences
+  SharedPreferences settings;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -193,19 +204,34 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     logger = new Logger(this.getApplicationContext());
     logger.addRecordToLog("onCreate: init logger");
 
+    settings = getSharedPreferences("settings", 0);
+
     //object detection code
-    final float textSizePx =
-            TypedValue.applyDimension(
-                    TypedValue.COMPLEX_UNIT_DIP, TEXT_SIZE_DIP, getResources().getDisplayMetrics());
+    int cropSize = TF_OD_API_INPUT_SIZE_0;
     try {
-      personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE, textSizePx);
+      switch (settings.getInt("efficientDet", 0)){
+        default:
+          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_0, TF_OD_API_INPUT_SIZE_0);
+          cropSize = TF_OD_API_INPUT_SIZE_0;
+          break;
+        case 0:
+          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_0, TF_OD_API_INPUT_SIZE_0);
+          cropSize = TF_OD_API_INPUT_SIZE_0;
+          break;
+        case 2:
+          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_2, TF_OD_API_INPUT_SIZE_2);
+          cropSize = TF_OD_API_INPUT_SIZE_2;
+          break;
+        case 4:
+          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_4, TF_OD_API_INPUT_SIZE_4);
+          cropSize = TF_OD_API_INPUT_SIZE_4;
+          break;
+      }
+
     } catch (IOException e) {
       e.printStackTrace();
       logger.addRecordToLog("onCreate: " + e.toString());
     }
-    personDetection.getBorderedText().setTypeface(Typeface.MONOSPACE);
-
-    int cropSize = TF_OD_API_INPUT_SIZE;
 
     imageWidth = 640;
     imageHeight = 480;
@@ -289,6 +315,15 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
           isTakingPicture = true;
           onTakePicture();
         }
+      }
+    });
+
+    // Open Settings
+    settingButton = (ImageButton)findViewById(R.id.settingButton);
+    settingButton.setOnClickListener(new View.OnClickListener() {
+      public void onClick(View v) {
+        isTakingPicture = true;
+        openSettings();
       }
     });
 
@@ -412,6 +447,42 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
         e.printStackTrace();
       }
     }
+
+    // Object Detection resume
+    int cropSize = TF_OD_API_INPUT_SIZE_0;
+    try {
+      switch (settings.getInt("efficientDet", 0)){
+        default:
+          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_0, TF_OD_API_INPUT_SIZE_0);
+          cropSize = TF_OD_API_INPUT_SIZE_0;
+          break;
+        case 0:
+          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_0, TF_OD_API_INPUT_SIZE_0);
+          cropSize = TF_OD_API_INPUT_SIZE_0;
+          break;
+        case 2:
+          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_2, TF_OD_API_INPUT_SIZE_2);
+          cropSize = TF_OD_API_INPUT_SIZE_2;
+          break;
+        case 4:
+          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_4, TF_OD_API_INPUT_SIZE_4);
+          cropSize = TF_OD_API_INPUT_SIZE_4;
+          break;
+      }
+
+    } catch (IOException e) {
+      e.printStackTrace();
+      logger.addRecordToLog("onCreate: " + e.toString());
+    }
+
+    frameToCropTransform =
+            ImageUtil.getTransformationMatrix(
+                    imageWidth, imageHeight,
+                    cropSize, cropSize,
+                    sensorOrientation, MAINTAIN_ASPECT);
+
+    cropToFrameTransform = new android.graphics.Matrix();
+    frameToCropTransform.invert(cropToFrameTransform);
 
     surfaceView.onResume();
     displayRotationHelper.onResume();
@@ -646,17 +717,24 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     writeJsonFile(distanceTracker, depthFileName, imageFileName, JSONFileName, personDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform), (float) depthCalibrator.getScaleFactor(), (float) depthCalibrator.getShiftFactor(), frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
 
-    if(intent == null) {
-      intent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
+    if(galleryIntent == null) {
+      galleryIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
     }
-    startActivityForResult(intent, 0);
+    startActivityForResult(galleryIntent, 0);
   }
 
   public void onViewGallery(){
-    if(intent == null) {
-      intent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
+    if(galleryIntent == null) {
+      galleryIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
     }
-    startActivityForResult(intent, 0);
+    startActivityForResult(galleryIntent, 0);
+  }
+
+  private void openSettings() {
+    if(settingIntent == null) {
+      settingIntent = new Intent(surfaceView.getContext(), SettingsActivity.class);
+    }
+    startActivityForResult(settingIntent, 0);
   }
 
   public void writeJsonFile(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d) {

@@ -47,6 +47,10 @@
         android:name=".ResultViewerActivity"
         android:screenOrientation="landscape">
     </activity>
+    <activity
+        android:name=".SettingsActivity"
+        android:screenOrientation="landscape">
+    </activity>
     <!-- Indicates whether "Google Play Services for AR" (ARCore) is "required" or "optional". -->
     <meta-data android:name="com.google.ar.core" android:value="required" />
   </application>
