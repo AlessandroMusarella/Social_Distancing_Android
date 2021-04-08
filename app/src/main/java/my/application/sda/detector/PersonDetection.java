@@ -2,33 +2,18 @@ package my.application.sda.detector;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.Matrix;
-import android.os.Environment;
-import android.util.Size;
 
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.List;
 
-import my.application.sda.detector.BorderedText;
-import my.application.sda.detector.Detector;
-import my.application.sda.detector.MultiBoxTracker;
-import my.application.sda.model.TFLiteDepthModel;
 import my.application.sda.model.TFLiteObjectDetectionModel;
 
 public class PersonDetection {
 
     private TFLiteObjectDetectionModel ODModel;
-    private MultiBoxTracker tracker;
     private Bitmap croppedBitmap;
 
     private static final DetectorMode MODE = DetectorMode.TF_OD_API;
@@ -41,12 +26,11 @@ public class PersonDetection {
 
     public void init (Context context, String modelFileName, int size) throws IOException {
         ODModel = new TFLiteObjectDetectionModel(context, modelFileName);
-        tracker = new MultiBoxTracker(context);
         detSize = size;
     }
 
 
-    public List<Detector.Recognition> getRecognitionsTrackedfrom(Bitmap currentFrameBitmap, Matrix cropToFrameTransform){
+    public List<Detector.Recognition> getRecognitionsTrackedFrom(Bitmap currentFrameBitmap, Matrix cropToFrameTransform){
 
         currentFrameBitmap = currentFrameBitmap.copy(Bitmap.Config.ARGB_8888, true);
         croppedBitmap = Bitmap.createScaledBitmap(currentFrameBitmap, detSize, detSize, true);
@@ -77,10 +61,6 @@ public class PersonDetection {
 
     public TFLiteObjectDetectionModel getODModel() {
         return ODModel;
-    }
-
-    public MultiBoxTracker getTracker() {
-        return tracker;
     }
 
     private enum DetectorMode {

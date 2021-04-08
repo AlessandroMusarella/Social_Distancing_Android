@@ -22,13 +22,11 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.media.Image;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
 import android.os.Handler;
-import android.util.TypedValue;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -245,8 +243,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
     cropToFrameTransform = new android.graphics.Matrix();
     frameToCropTransform.invert(cropToFrameTransform);
-
-    personDetection.getTracker().setFrameConfiguration(imageWidth, imageHeight, sensorOrientation);
 
     // ViewGallery ImageButton
     viewGallery = (ImageButton)findViewById(R.id.viewGallery);
@@ -697,14 +693,21 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       depthCalibrator = new DepthCalibrator(this.getApplicationContext(), imageWidth, imageHeight);
     }
 
+    //long startTime = System.nanoTime();
+
     depthCalibrator.doInference(frameContainer);
 
     Bitmap currentFrameBitmap = depthCalibrator.getImageBitmap();
     Bitmap currentDepthBitmap = depthCalibrator.getDepthBitmap();
 
+    //long pydnetTime = System.nanoTime();
+
     distanceTracker.setCameraParameters(frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
     distanceTracker.setDepthMap(depthCalibrator.getDepthMap(), (float)depthCalibrator.getScaleFactor(), (float)depthCalibrator.getShiftFactor());
-    Bitmap detectionBitmap = distanceTracker.getTrackedBitmap(currentFrameBitmap, personDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform));
+    List<Detector.Recognition> personRecognitions = personDetection.getRecognitionsTrackedFrom(currentFrameBitmap, cropToFrameTransform);
+    Bitmap detectionBitmap = distanceTracker.getTrackedBitmap(currentFrameBitmap, personRecognitions);
+
+    //long detectionTime = System.nanoTime();
 
     String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
     String imageFileName = "sda-" + timeStamp + "-0image.jpg";
@@ -715,7 +718,10 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     ImageUtil.createImageFromBitmap(detectionBitmap, detectionFileName, surfaceView.getContext());
     ImageUtil.createImageFromBitmap(frameContainer.getImage(), imageFileName, surfaceView.getContext());
 
-    writeJsonFile(distanceTracker, depthFileName, imageFileName, JSONFileName, personDetection.getRecognitionsTrackedfrom(currentFrameBitmap, cropToFrameTransform), (float) depthCalibrator.getScaleFactor(), (float) depthCalibrator.getShiftFactor(), frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
+    writeJsonFile(distanceTracker, depthFileName, imageFileName, JSONFileName, personRecognitions, (float) depthCalibrator.getScaleFactor(), (float) depthCalibrator.getShiftFactor(), frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
+
+    //System.out.println("pydnetTime = " + (pydnetTime-startTime)/1000000);
+    //System.out.println("detectionTime = " + (detectionTime-pydnetTime)/1000000);
 
     if(galleryIntent == null) {
       galleryIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
@@ -723,7 +729,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     startActivityForResult(galleryIntent, 0);
   }
 
-  public void onViewGallery(){
+  private void onViewGallery(){
     if(galleryIntent == null) {
       galleryIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
     }
@@ -737,7 +743,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     startActivityForResult(settingIntent, 0);
   }
 
-  public void writeJsonFile(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d) {
+  private void writeJsonFile(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d) {
     JSONObject sampleObject = new JSONObject();
     JSONObject sampleObject1 = new JSONObject();
     try {
