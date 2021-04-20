@@ -61,6 +61,7 @@ import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
 import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.google.ar.core.exceptions.UnavailableUserDeclinedInstallationException;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -74,6 +75,8 @@ import my.application.sda.helpers.ImageUtil;
 import my.application.sda.helpers.ImageUtilsKt;
 import my.application.sda.helpers.Logger;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -190,8 +193,16 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   Intent galleryIntent;
   Intent settingIntent;
 
-  //Shared preferences
+  // Shared preferences
   SharedPreferences settings;
+
+  // Button to start a recording. It will end automatically when a picture is taken, or if stopped
+  ImageButton recordButton;
+  boolean isRecording;
+  int frameCounter;
+  File dirRecordings;
+  String recordingPath;
+  TextView textRec;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -328,6 +339,31 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     errorText = (TextView)findViewById(R.id.errorText);
 
     displayRotationHelper = new DisplayRotationHelper(/*context=*/ this);
+
+    // RecordButton ImageButton
+    isRecording = false;
+    recordButton = (ImageButton)findViewById(R.id.recordButton);
+    textRec = (TextView)findViewById(R.id.textRec);
+    recordButton.setOnClickListener(new View.OnClickListener() {
+      public void onClick(View v) {
+        if(!isRecording) {
+          isRecording = true;
+          textRec.setVisibility(View.VISIBLE);
+          frameCounter = 0;
+          String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
+          File currentVideo = new File(dirRecordings.getAbsolutePath(), timeStamp);
+          currentVideo.mkdir();
+          recordingPath = currentVideo.getAbsolutePath();
+        }
+        else{
+          isRecording = false;
+          textRec.setVisibility(View.INVISIBLE);
+        }
+      }
+    });
+
+    // Create directory in which we will save videos
+    dirRecordings = getApplicationContext().getDir("recordings", 0);
 
     // Set up renderer.
     render = new SampleRender(surfaceView, this, getAssets());
@@ -624,8 +660,25 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
       frameContainer.fill(imageBitmap, frame.getCamera().getPose(), projectionMatrix, viewMatrix, fx_d, fy_d, cx_d, cy_d);
 
+      if(isRecording){
+        //save frame image
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
+        FileOutputStream fo = new FileOutputStream(recordingPath+"/img"+frameCounter+".jpg");
+        fo.write(bytes.toByteArray());
+        fo.close();
+
+        //save camera parameters
+        writeCameraParametersJSON(recordingPath+"/camera"+frameCounter+".json", frameContainer);
+
+        // save pointCloud
+        writePointCloudJSON(recordingPath+"/pointCloud"+frameCounter+".json", frameContainer.getPointCloud());
+
+        frameCounter++;
+      }
+
       imageFrame.close();
-    } catch (NotYetAvailableException e) {
+    } catch (NotYetAvailableException | IOException e) {
       e.printStackTrace();
       //logger.addRecordToLog("onDrawFrame: " + e.toString());
     }
@@ -710,15 +763,20 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     //long detectionTime = System.nanoTime();
 
     String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
-    String imageFileName = "sda-" + timeStamp + "-0image.jpg";
+
     String depthFileName = "sda-" + timeStamp + "-1depth.jpg";
     String detectionFileName = "sda-" + timeStamp + "-2detection.jpg";
-    String JSONFileName = "sda-" + timeStamp + ".json";
+
     ImageUtil.createImageFromBitmap(currentDepthBitmap, depthFileName, surfaceView.getContext());
     ImageUtil.createImageFromBitmap(detectionBitmap, detectionFileName, surfaceView.getContext());
-    ImageUtil.createImageFromBitmap(frameContainer.getImage(), imageFileName, surfaceView.getContext());
 
+    /*
+    // JSON file for 3D scene reconstruction
+    String imageFileName = "sda-" + timeStamp + "-0image.jpg";
+    String JSONFileName = "sda-" + timeStamp + ".json";
+    ImageUtil.createImageFromBitmap(frameContainer.getImage(), imageFileName, surfaceView.getContext());
     writeJsonFile(distanceTracker, depthFileName, imageFileName, JSONFileName, personRecognitions, (float) depthCalibrator.getScaleFactor(), (float) depthCalibrator.getShiftFactor(), frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
+    */
 
     //System.out.println("pydnetTime = " + (pydnetTime-startTime)/1000000);
     //System.out.println("detectionTime = " + (detectionTime-pydnetTime)/1000000);
@@ -745,7 +803,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
   private void writeJsonFile(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d) {
     JSONObject sampleObject = new JSONObject();
-    JSONObject sampleObject1 = new JSONObject();
     try {
       sampleObject.put("fileDepth", depthFileName);
       sampleObject.put("imageFileName", imageFileName);
@@ -771,7 +828,58 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       sampleObject.put("detections", new ObjectMapper().writeValueAsString(finalMap));
 
       FileOutputStream fos = this.getApplicationContext().openFileOutput(filename, Context.MODE_PRIVATE);
-      String finalMessage = sampleObject.toString();
+      String finalMessage = sampleObject.toString(2);
+      fos.write(finalMessage.getBytes());
+      fos.flush();
+      fos.close();
+    } catch (JSONException | FileNotFoundException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void writeCameraParametersJSON(String filename, FrameContainer frameContainer){
+    JSONObject jObj = new JSONObject();
+    try{
+      JSONArray projectionMatrix = new JSONArray(frameContainer.getProjectionMatrix());
+      jObj.put("projectionMatrix", projectionMatrix);
+
+      JSONArray viewMatrix = new JSONArray(frameContainer.getViewMatrix());
+      jObj.put("viewMatrix", viewMatrix);
+
+      jObj.put("fx_d", frameContainer.getFx_d());
+      jObj.put("fy_d", frameContainer.getFy_d());
+      jObj.put("cx_d", frameContainer.getCx_d());
+      jObj.put("cy_d", frameContainer.getCy_d());
+
+      FileOutputStream fos = new FileOutputStream(filename);
+      String finalMessage = jObj.toString(5);
+      fos.write(finalMessage.getBytes());
+      fos.flush();
+      fos.close();
+    } catch (JSONException | FileNotFoundException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void writePointCloudJSON(String filename, Point[] points){
+    JSONObject jObj = new JSONObject();
+    try{
+      JSONArray jPointCloud = new JSONArray();
+      if(points != null) {
+        for (Point point : points) {
+          JSONArray jPoint = new JSONArray(new float[]{point.getX(), point.getY(), point.getZ()});
+          jPointCloud.put(jPoint);
+        }
+      }
+
+      jObj.put("pointCloud", jPointCloud);
+
+      FileOutputStream fos = new FileOutputStream(filename);
+      String finalMessage = jObj.toString(5);
       fos.write(finalMessage.getBytes());
       fos.flush();
       fos.close();
