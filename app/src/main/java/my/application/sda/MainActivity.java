@@ -16,17 +16,13 @@
 
 package my.application.sda;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.Color;
 import android.media.Image;
 import android.opengl.GLSurfaceView;
 import android.opengl.Matrix;
 import android.os.Bundle;
-import android.os.Handler;
 import android.view.View;
 import android.widget.ImageButton;
 import android.widget.TextView;
@@ -34,7 +30,6 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.Camera;
 import com.google.ar.core.Config;
@@ -65,13 +60,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import my.application.sda.calibrator.DepthCalibrator;
-import my.application.sda.calibrator.FrameContainer;
-import my.application.sda.calibrator.Point;
-import my.application.sda.detector.Detector;
-import my.application.sda.detector.DistanceTracker;
-import my.application.sda.detector.PersonDetection;
-import my.application.sda.helpers.ImageUtil;
+
+import my.application.sda.helpers.CoordsUtils;
 import my.application.sda.helpers.ImageUtilsKt;
 import my.application.sda.helpers.Logger;
 
@@ -81,12 +71,7 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * This is a simple example that shows how to create an augmented reality (AR) application using the
@@ -145,64 +130,24 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private final float[] viewInverseMatrix = new float[16];
   private int cont = 0;
 
-  // Button to take a picture and change screen
-  private ImageButton takePicture;
-
-  // Button to see the picture saved in gallery
-  private ImageButton viewGallery;
-  private String[] imagePaths;
-  private int dimPrec;
+  // Button to start and stop recording ARCore feature points
+  private ImageButton startRecording;
 
   // TextView for notifications
   private TextView textNotification;
 
-  // TextView for errors
-  private TextView errorText;
-
-  // Button to open settings
-  private ImageButton settingButton;
-
-  // Depth calibrating variables
-  DepthCalibrator depthCalibrator;
-  FrameContainer frameContainer = new FrameContainer();
+  // Container variables
   Point[] currentPointCloud;
-  boolean isTakingPicture = false;
-
-  // Object Detection variables
-  private static final String TF_OD_API_MODEL_FILE_0 = "efficientDet0.tflite";
-  private static final String TF_OD_API_MODEL_FILE_2 = "efficientDet2.tflite";
-  private static final String TF_OD_API_MODEL_FILE_4 = "efficientDet4.tflite";
-  private static final int TF_OD_API_INPUT_SIZE_0 = 320;
-  private static final int TF_OD_API_INPUT_SIZE_2 = 448;
-  private static final int TF_OD_API_INPUT_SIZE_4 = 512;
-  private static final float TEXT_SIZE_DIP = 10;
-  private static final boolean MAINTAIN_ASPECT = false;
-  private PersonDetection personDetection = new PersonDetection();
-  private android.graphics.Matrix frameToCropTransform;
-  private android.graphics.Matrix cropToFrameTransform;
-  private int imageWidth, imageHeight;
-  private Integer sensorOrientation;
-
-  // Tracker
-  private DistanceTracker distanceTracker = new DistanceTracker();
+  FrameContainer frameContainer = new FrameContainer();
 
   // Logger
   private Logger logger;
 
-  // To switch between activities
-  Intent galleryIntent;
-  Intent settingIntent;
-
-  // Shared preferences
-  SharedPreferences settings;
-
-  // Button to start a recording. It will end automatically when a picture is taken, or if stopped
-  ImageButton recordButton;
   boolean isRecording;
   int frameCounter;
   File dirRecordings;
   String recordingPath;
-  TextView textRec;
+
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -213,154 +158,25 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     logger = new Logger(this.getApplicationContext());
     logger.addRecordToLog("onCreate: init logger");
 
-    settings = getSharedPreferences("settings", 0);
-
-    //object detection code
-    int cropSize = TF_OD_API_INPUT_SIZE_0;
-    try {
-      switch (settings.getInt("efficientDet", 0)){
-        default:
-          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_0, TF_OD_API_INPUT_SIZE_0);
-          cropSize = TF_OD_API_INPUT_SIZE_0;
-          break;
-        case 0:
-          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_0, TF_OD_API_INPUT_SIZE_0);
-          cropSize = TF_OD_API_INPUT_SIZE_0;
-          break;
-        case 2:
-          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_2, TF_OD_API_INPUT_SIZE_2);
-          cropSize = TF_OD_API_INPUT_SIZE_2;
-          break;
-        case 4:
-          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_4, TF_OD_API_INPUT_SIZE_4);
-          cropSize = TF_OD_API_INPUT_SIZE_4;
-          break;
-      }
-
-    } catch (IOException e) {
-      e.printStackTrace();
-      logger.addRecordToLog("onCreate: " + e.toString());
-    }
-
-    imageWidth = 640;
-    imageHeight = 480;
-    sensorOrientation = 0;
-
-    frameToCropTransform =
-            ImageUtil.getTransformationMatrix(
-                    imageWidth, imageHeight,
-                    cropSize, cropSize,
-                    sensorOrientation, MAINTAIN_ASPECT);
-
-    cropToFrameTransform = new android.graphics.Matrix();
-    frameToCropTransform.invert(cropToFrameTransform);
-
-    // ViewGallery ImageButton
-    viewGallery = (ImageButton)findViewById(R.id.viewGallery);
-    imagePaths = this.getApplicationContext().getFilesDir().list();
-    int cont = 0;
-    for (int i = 0; i < imagePaths.length; i++){
-      if (imagePaths[i].contains(".jpg"))
-        cont++;
-    }
-    String [] temp = new String[cont];
-    cont=0;
-    for(int i=0; i < imagePaths.length; i++){
-      if (imagePaths[i].contains(".jpg")) {
-        temp[cont++] = imagePaths[i];
-      }
-    }
-    imagePaths = temp;
-    Arrays.sort(imagePaths);
-    dimPrec = imagePaths.length;
-    if (imagePaths.length > 0) {
-      try {
-        viewGallery.setImageBitmap(BitmapFactory.decodeStream(this.getApplicationContext().openFileInput(imagePaths[imagePaths.length - 1])));
-      } catch (FileNotFoundException e) {
-        e.printStackTrace();
-        logger.addRecordToLog("onCreate: " + e.toString());
-      }
-    }
-    viewGallery.setOnClickListener(new View.OnClickListener() {
-      public void onClick(View v) {
-        if (imagePaths.length == 0 || imagePaths.length == 1){
-          errorText.setTextColor(Color.WHITE);
-          errorText.setTextSize(20);
-          errorText.setText("No image available");
-          new Handler().postDelayed(new Runnable(){
-            @Override
-            public void run()
-            {
-              errorText.setText("");
-            }
-          }, 3000);
-          return;
-        }else {
-          isTakingPicture = true;
-          onViewGallery();
-        }
-      }
-    });
-
     // TakePicture
-    takePicture = (ImageButton)findViewById(R.id.takePicture);
-    takePicture.setOnClickListener(new View.OnClickListener() {
-      public void onClick(View v) {
-        if (currentPointCloud == null || currentPointCloud.length == 0){
-          errorText.setTextColor(Color.RED);
-          errorText.setTextSize(20);
-          errorText.setText("Not enough feature points: move the device around");
-          new Handler().postDelayed(new Runnable(){
-            @Override
-            public void run()
-            {
-              errorText.setText("");
-            }
-          }, 5000);
-          return;
-        }else {
-          isTakingPicture = true;
-          onTakePicture();
-        }
-      }
-    });
-
-    // Open Settings
-    settingButton = (ImageButton)findViewById(R.id.settingButton);
-    settingButton.setOnClickListener(new View.OnClickListener() {
-      public void onClick(View v) {
-        isTakingPicture = true;
-        openSettings();
-      }
-    });
-
-    // Text label
-    textNotification = (TextView)findViewById(R.id.textNotification);
-    errorText = (TextView)findViewById(R.id.errorText);
-
-    displayRotationHelper = new DisplayRotationHelper(/*context=*/ this);
-
-    // RecordButton ImageButton
     isRecording = false;
-    recordButton = (ImageButton)findViewById(R.id.recordButton);
-    textRec = (TextView)findViewById(R.id.textRec);
-    recordButton.setOnClickListener(new View.OnClickListener() {
+    startRecording = (ImageButton)findViewById(R.id.startRecording);
+    startRecording.setOnClickListener(new View.OnClickListener() {
       public void onClick(View v) {
-        if(!isRecording) {
-          isRecording = true;
-          textRec.setVisibility(View.VISIBLE);
-          frameCounter = 0;
+        isRecording = !isRecording;
+        if(isRecording) {
           String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
           File currentVideo = new File(dirRecordings.getAbsolutePath(), timeStamp);
           currentVideo.mkdir();
           recordingPath = currentVideo.getAbsolutePath();
         }
-        else{
-          isRecording = false;
-          textRec.setVisibility(View.INVISIBLE);
-        }
       }
     });
+
+    // Text label
+    textNotification = (TextView)findViewById(R.id.textNotification);
+
+    displayRotationHelper = new DisplayRotationHelper(/*context=*/ this);
 
     // Create directory in which we will save videos
     dirRecordings = getApplicationContext().getDir("recordings", 0);
@@ -391,7 +207,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   protected void onResume() {
     super.onResume();
 
-    isTakingPicture = false;
+    isRecording = false;
 
     if (session == null) {
       Exception exception = null;
@@ -455,66 +271,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       session = null;
       return;
     }
-
-    imagePaths = this.getApplicationContext().getFilesDir().list();
-    int cont = 0;
-    for (int i = 0; i < imagePaths.length; i++){
-      if (imagePaths[i].contains(".jpg"))
-        cont++;
-    }
-    String [] temp = new String[cont];
-    cont=0;
-    for(int i=0; i < imagePaths.length; i++){
-      if (imagePaths[i].contains(".jpg")) {
-        temp[cont++] = imagePaths[i];
-      }
-    }
-    imagePaths = temp;
-    Arrays.sort(imagePaths);
-    if (imagePaths.length > 0 && dimPrec != imagePaths.length) {
-      dimPrec = imagePaths.length;
-      try {
-        viewGallery.setImageBitmap(BitmapFactory.decodeStream(this.getApplicationContext().openFileInput(imagePaths[imagePaths.length - 1])));
-      } catch (FileNotFoundException e) {
-        e.printStackTrace();
-      }
-    }
-
-    // Object Detection resume
-    int cropSize = TF_OD_API_INPUT_SIZE_0;
-    try {
-      switch (settings.getInt("efficientDet", 0)){
-        default:
-          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_0, TF_OD_API_INPUT_SIZE_0);
-          cropSize = TF_OD_API_INPUT_SIZE_0;
-          break;
-        case 0:
-          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_0, TF_OD_API_INPUT_SIZE_0);
-          cropSize = TF_OD_API_INPUT_SIZE_0;
-          break;
-        case 2:
-          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_2, TF_OD_API_INPUT_SIZE_2);
-          cropSize = TF_OD_API_INPUT_SIZE_2;
-          break;
-        case 4:
-          personDetection.init(this.getApplicationContext(), TF_OD_API_MODEL_FILE_4, TF_OD_API_INPUT_SIZE_4);
-          cropSize = TF_OD_API_INPUT_SIZE_4;
-          break;
-      }
-
-    } catch (IOException e) {
-      e.printStackTrace();
-      logger.addRecordToLog("onCreate: " + e.toString());
-    }
-
-    frameToCropTransform =
-            ImageUtil.getTransformationMatrix(
-                    imageWidth, imageHeight,
-                    cropSize, cropSize,
-                    sensorOrientation, MAINTAIN_ASPECT);
-
-    cropToFrameTransform = new android.graphics.Matrix();
-    frameToCropTransform.invert(cropToFrameTransform);
 
     surfaceView.onResume();
     displayRotationHelper.onResume();
@@ -604,10 +360,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   @Override
   public void onDrawFrame(SampleRender render) {
 
-    if (isTakingPicture){
-      return;
-    }
-
     if (session == null) {
       logger.addRecordToLog("onDrawFrame: session is null");
       return;
@@ -642,45 +394,39 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     Camera camera = frame.getCamera();
 
     // Save information about current frame on FrameContainer
-    try {
-      Image imageFrame = frame.acquireCameraImage();
+    if(isRecording) {
+      try {
+        Image imageFrame = frame.acquireCameraImage();
 
-      Bitmap imageBitmap = ImageUtilsKt.yuvToBitmap(imageFrame);
+        Bitmap imageBitmap = ImageUtilsKt.yuvToBitmap(imageFrame);
 
-      float fx_d, fy_d, cx_d, cy_d;
-      float[] projectionMatrix = new float[16];
-      float[] viewMatrix = new float[16];
-      frame.getCamera().getProjectionMatrix(projectionMatrix, 0, Z_NEAR, Z_FAR);
-      frame.getCamera().getViewMatrix(viewMatrix, 0);
+        float fx_d, fy_d, cx_d, cy_d;
+        float[] projectionMatrix = new float[16];
+        float[] viewMatrix = new float[16];
+        frame.getCamera().getProjectionMatrix(projectionMatrix, 0, Z_NEAR, Z_FAR);
+        frame.getCamera().getViewMatrix(viewMatrix, 0);
 
-      fx_d = frame.getCamera().getImageIntrinsics().getFocalLength()[0];
-      fy_d = frame.getCamera().getImageIntrinsics().getFocalLength()[1];
-      cx_d = frame.getCamera().getImageIntrinsics().getPrincipalPoint()[0];
-      cy_d = frame.getCamera().getImageIntrinsics().getPrincipalPoint()[1];
+        fx_d = frame.getCamera().getImageIntrinsics().getFocalLength()[0];
+        fy_d = frame.getCamera().getImageIntrinsics().getFocalLength()[1];
+        cx_d = frame.getCamera().getImageIntrinsics().getPrincipalPoint()[0];
+        cy_d = frame.getCamera().getImageIntrinsics().getPrincipalPoint()[1];
 
-      frameContainer.fill(imageBitmap, frame.getCamera().getPose(), projectionMatrix, viewMatrix, fx_d, fy_d, cx_d, cy_d);
+        frameContainer.fill(imageBitmap, frame.getCamera().getPose(), projectionMatrix, viewMatrix, fx_d, fy_d, cx_d, cy_d);
 
-      if(isRecording){
         //save frame image
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         imageBitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
-        FileOutputStream fo = new FileOutputStream(recordingPath+"/img"+frameCounter+".jpg");
+        FileOutputStream fo = new FileOutputStream(recordingPath + "/img" + frameCounter + ".jpg");
         fo.write(bytes.toByteArray());
         fo.close();
 
         //save camera parameters
-        writeCameraParametersJSON(recordingPath+"/camera"+frameCounter+".json", frameContainer);
-
-        // save pointCloud
-        writePointCloudJSON(recordingPath+"/pointCloud"+frameCounter+".json", frameContainer.getPointCloud());
-
-        frameCounter++;
+        writeCameraParametersJSON(recordingPath + "/camera" + frameCounter + ".json", frameContainer);
+        imageFrame.close();
+      } catch (NotYetAvailableException | IOException e) {
+        e.printStackTrace();
+        //logger.addRecordToLog("onDrawFrame: " + e.toString());
       }
-
-      imageFrame.close();
-    } catch (NotYetAvailableException | IOException e) {
-      e.printStackTrace();
-      //logger.addRecordToLog("onDrawFrame: " + e.toString());
     }
 
     // BackgroundRenderer.updateDisplayGeometry must be called every frame to update the coordinates
@@ -718,7 +464,12 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
         pointCloudVertexBuffer.set(pointCloud.getPoints());
         lastPointCloudTimestamp = pointCloud.getTimestamp();
         currentPointCloud = Point.parsePointCloud(pointCloud);
-        frameContainer.setPointCloud(currentPointCloud);
+
+        // save pointCloud
+        if(isRecording){
+          writePointCloudJSON(recordingPath+"/pointCloud"+frameCounter+".json", currentPointCloud, frameContainer);
+          frameCounter++;
+        }
       }
       Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
       pointCloudShader.setMat4("u_ModelViewProjection", modelViewProjectionMatrix);
@@ -729,7 +480,8 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
             new Runnable() {
               @Override
               public void run() {
-                textNotification.setText("Point Cloud: " + currentPointCloud.length);
+                if(currentPointCloud != null)
+                  textNotification.setText("Point Cloud: " + currentPointCloud.length);
               }
             });
   }
@@ -739,104 +491,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     Config config = session.getConfig();
 
     session.configure(config);
-  }
-
-  private void onTakePicture(){
-    if(depthCalibrator == null){
-      depthCalibrator = new DepthCalibrator(this.getApplicationContext(), imageWidth, imageHeight);
-    }
-
-    //long startTime = System.nanoTime();
-
-    depthCalibrator.doInference(frameContainer);
-
-    Bitmap currentFrameBitmap = depthCalibrator.getImageBitmap();
-    Bitmap currentDepthBitmap = depthCalibrator.getDepthBitmap();
-
-    //long pydnetTime = System.nanoTime();
-
-    distanceTracker.setCameraParameters(frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
-    distanceTracker.setDepthMap(depthCalibrator.getDepthMap(), (float)depthCalibrator.getScaleFactor(), (float)depthCalibrator.getShiftFactor());
-    List<Detector.Recognition> personRecognitions = personDetection.getRecognitionsTrackedFrom(currentFrameBitmap, cropToFrameTransform);
-    Bitmap detectionBitmap = distanceTracker.getTrackedBitmap(currentFrameBitmap, personRecognitions);
-
-    //long detectionTime = System.nanoTime();
-
-    String timeStamp = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
-
-    String depthFileName = "sda-" + timeStamp + "-1depth.jpg";
-    String detectionFileName = "sda-" + timeStamp + "-2detection.jpg";
-
-    ImageUtil.createImageFromBitmap(currentDepthBitmap, depthFileName, surfaceView.getContext());
-    ImageUtil.createImageFromBitmap(detectionBitmap, detectionFileName, surfaceView.getContext());
-
-    /*
-    // JSON file for 3D scene reconstruction
-    String imageFileName = "sda-" + timeStamp + "-0image.jpg";
-    String JSONFileName = "sda-" + timeStamp + ".json";
-    ImageUtil.createImageFromBitmap(frameContainer.getImage(), imageFileName, surfaceView.getContext());
-    writeJsonFile(distanceTracker, depthFileName, imageFileName, JSONFileName, personRecognitions, (float) depthCalibrator.getScaleFactor(), (float) depthCalibrator.getShiftFactor(), frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
-    */
-
-    //System.out.println("pydnetTime = " + (pydnetTime-startTime)/1000000);
-    //System.out.println("detectionTime = " + (detectionTime-pydnetTime)/1000000);
-
-    if(galleryIntent == null) {
-      galleryIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
-    }
-    startActivityForResult(galleryIntent, 0);
-  }
-
-  private void onViewGallery(){
-    if(galleryIntent == null) {
-      galleryIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
-    }
-    startActivityForResult(galleryIntent, 0);
-  }
-
-  private void openSettings() {
-    if(settingIntent == null) {
-      settingIntent = new Intent(surfaceView.getContext(), SettingsActivity.class);
-    }
-    startActivityForResult(settingIntent, 0);
-  }
-
-  private void writeJsonFile(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d) {
-    JSONObject sampleObject = new JSONObject();
-    try {
-      sampleObject.put("fileDepth", depthFileName);
-      sampleObject.put("imageFileName", imageFileName);
-      sampleObject.put("scale_factor", scale_factor);
-      sampleObject.put("shift_factor", shift_factor);
-      sampleObject.put("fx_d", fx_d);
-      sampleObject.put("fy_d", fy_d);
-      sampleObject.put("cx_d", cx_d);
-      sampleObject.put("cy_d", cy_d);
-
-      List<Map> finalMap = new ArrayList<>();
-      List<String> colored_shapes = distanceTracker.getColored_shapes();
-      int cont_pers = 0;
-      for (Detector.Recognition r : mappedRecognitions){
-        Map<String, String> recognitions = new HashMap<>();
-        recognitions.put("rectf_bottom", r.getLocation().bottom + "");
-        recognitions.put("rectf_top", r.getLocation().top + "");
-        recognitions.put("rectf_left", r.getLocation().left + "");
-        recognitions.put("rectf_right", r.getLocation().right + "");
-        recognitions.put("color", colored_shapes.get(cont_pers++));
-        finalMap.add(recognitions);
-      }
-      sampleObject.put("detections", new ObjectMapper().writeValueAsString(finalMap));
-
-      FileOutputStream fos = this.getApplicationContext().openFileOutput(filename, Context.MODE_PRIVATE);
-      String finalMessage = sampleObject.toString(2);
-      fos.write(finalMessage.getBytes());
-      fos.flush();
-      fos.close();
-    } catch (JSONException | FileNotFoundException e) {
-      e.printStackTrace();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
   }
 
   private void writeCameraParametersJSON(String filename, FrameContainer frameContainer){
@@ -865,18 +519,34 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     }
   }
 
-  private void writePointCloudJSON(String filename, Point[] points){
+  private void writePointCloudJSON(String filename, Point[] points, FrameContainer frameContainer){
     JSONObject jObj = new JSONObject();
     try{
-      JSONArray jPointCloud = new JSONArray();
+      JSONArray j3D = new JSONArray();
+      JSONArray j2D = new JSONArray();
       if(points != null) {
         for (Point point : points) {
-          JSONArray jPoint = new JSONArray(new float[]{point.getX(), point.getY(), point.getZ()});
-          jPointCloud.put(jPoint);
+
+          android.graphics.Point screenPoint = CoordsUtils.worldToScreen(new float[]{point.getX(), point.getY(), point.getZ()},
+                  frameContainer.getImage().getWidth(),
+                  frameContainer.getImage().getHeight(),
+                  frameContainer.getProjectionMatrix(),
+                  frameContainer.getViewMatrix());
+
+          // Clipping point outside screen
+          if(screenPoint.x >= frameContainer.getImage().getWidth() || screenPoint.y >= frameContainer.getImage().getHeight() || screenPoint.x < 0 || screenPoint.y < 0) {
+            continue;
+          }
+
+          JSONArray coords3D = new JSONArray(new float[]{point.getX(), point.getY(), point.getZ()});
+          j3D.put(coords3D);
+          JSONArray coords2D = new JSONArray(new float[]{screenPoint.x, screenPoint.y});
+          j2D.put(coords2D);
         }
       }
 
-      jObj.put("pointCloud", jPointCloud);
+      jObj.put("3d_coords", j3D);
+      jObj.put("2d_coords", j2D);
 
       FileOutputStream fos = new FileOutputStream(filename);
       String finalMessage = jObj.toString(5);

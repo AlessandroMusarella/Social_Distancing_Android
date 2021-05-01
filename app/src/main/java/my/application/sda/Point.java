@@ -1,4 +1,4 @@
-package my.application.sda.calibrator;
+package my.application.sda;
 
 import com.google.ar.core.PointCloud;
 

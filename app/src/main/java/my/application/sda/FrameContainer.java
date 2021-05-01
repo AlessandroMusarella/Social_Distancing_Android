@@ -1,13 +1,11 @@
-package my.application.sda.calibrator;
+package my.application.sda;
 
 // Object to contain information about ARFrame and avoid issue with concurrency
 
 import android.graphics.Bitmap;
 import android.media.Image;
-
 import com.google.ar.core.Pose;
-
-import my.application.sda.calibrator.Point;
+import my.application.sda.Point;
 
 public class FrameContainer {
 
