@@ -672,7 +672,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
         writeCameraParametersJSON(recordingPath+"/camera"+frameCounter+".json", frameContainer);
 
         // save pointCloud
-        writePointCloudJSON(recordingPath+"/pointCloud"+frameCounter+".json", frameContainer.getPointCloud());
+        //writePointCloudJSON(recordingPath+"/pointCloud"+frameCounter+".json", frameContainer.getPointCloud());
 
         frameCounter++;
       }
@@ -770,16 +770,43 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     ImageUtil.createImageFromBitmap(currentDepthBitmap, depthFileName, surfaceView.getContext());
     ImageUtil.createImageFromBitmap(detectionBitmap, detectionFileName, surfaceView.getContext());
 
-    /*
+
     // JSON file for 3D scene reconstruction
     String imageFileName = "sda-" + timeStamp + "-0image.jpg";
     String JSONFileName = "sda-" + timeStamp + ".json";
     ImageUtil.createImageFromBitmap(frameContainer.getImage(), imageFileName, surfaceView.getContext());
-    writeJsonFile(distanceTracker, depthFileName, imageFileName, JSONFileName, personRecognitions, (float) depthCalibrator.getScaleFactor(), (float) depthCalibrator.getShiftFactor(), frameContainer.getFx_d(), frameContainer.getFy_d(), frameContainer.getCx_d(), frameContainer.getCy_d());
-    */
+    /*
+    writeJsonFile1(distanceTracker,
+            depthFileName,
+            imageFileName,
+            JSONFileName,
+            personRecognitions,
+            (float) depthCalibrator.getScaleFactor(),
+            (float) depthCalibrator.getShiftFactor(),
+            frameContainer.getFx_d(),
+            frameContainer.getFy_d(),
+            frameContainer.getCx_d(),
+            frameContainer.getCy_d());
+     */
+
+    writeJsonFile2(distanceTracker,
+            depthFileName,
+            imageFileName,
+            JSONFileName,
+            personRecognitions,
+            (float) depthCalibrator.getScaleFactor(),
+            (float) depthCalibrator.getShiftFactor(),
+            frameContainer.getFx_d(),
+            frameContainer.getFy_d(),
+            frameContainer.getCx_d(),
+            frameContainer.getCy_d(),
+            frameContainer.getProjectionMatrix(),
+            frameContainer.getViewMatrix());
 
     //System.out.println("pydnetTime = " + (pydnetTime-startTime)/1000000);
     //System.out.println("detectionTime = " + (detectionTime-pydnetTime)/1000000);
+
+    textRec.setVisibility(View.INVISIBLE);
 
     if(galleryIntent == null) {
       galleryIntent = new Intent(surfaceView.getContext(), ResultViewerActivity.class);
@@ -801,7 +828,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     startActivityForResult(settingIntent, 0);
   }
 
-  private void writeJsonFile(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d) {
+  private void writeJsonFile1(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d) {
     JSONObject sampleObject = new JSONObject();
     try {
       sampleObject.put("fileDepth", depthFileName);
@@ -829,6 +856,50 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
 
       FileOutputStream fos = this.getApplicationContext().openFileOutput(filename, Context.MODE_PRIVATE);
       String finalMessage = sampleObject.toString(2);
+      fos.write(finalMessage.getBytes());
+      fos.flush();
+      fos.close();
+    } catch (JSONException | FileNotFoundException e) {
+      e.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+  }
+
+  private void writeJsonFile2(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d, float[] projectionMatrix, float[] viewMatrix) {
+    JSONObject jObj = new JSONObject();
+    try {
+      jObj.put("fileDepth", depthFileName);
+      jObj.put("imageFileName", imageFileName);
+      jObj.put("scale_factor", scale_factor);
+      jObj.put("shift_factor", shift_factor);
+      jObj.put("fx_d", fx_d);
+      jObj.put("fy_d", fy_d);
+      jObj.put("cx_d", cx_d);
+      jObj.put("cy_d", cy_d);
+
+      JSONArray jProjectionMatrix = new JSONArray(frameContainer.getProjectionMatrix());
+      jObj.put("projectionMatrix", jProjectionMatrix);
+
+      JSONArray jViewMatrix = new JSONArray(frameContainer.getViewMatrix());
+      jObj.put("viewMatrix", jViewMatrix);
+
+      List<Map> finalMap = new ArrayList<>();
+      List<String> colored_shapes = distanceTracker.getColored_shapes();
+      int cont_pers = 0;
+      for (Detector.Recognition r : mappedRecognitions){
+        Map<String, String> recognitions = new HashMap<>();
+        recognitions.put("rectf_bottom", r.getLocation().bottom + "");
+        recognitions.put("rectf_top", r.getLocation().top + "");
+        recognitions.put("rectf_left", r.getLocation().left + "");
+        recognitions.put("rectf_right", r.getLocation().right + "");
+        recognitions.put("color", colored_shapes.get(cont_pers++));
+        finalMap.add(recognitions);
+      }
+      jObj.put("detections", new ObjectMapper().writeValueAsString(finalMap));
+
+      FileOutputStream fos = this.getApplicationContext().openFileOutput(filename, Context.MODE_PRIVATE);
+      String finalMessage = jObj.toString(2);
       fos.write(finalMessage.getBytes());
       fos.flush();
       fos.close();
