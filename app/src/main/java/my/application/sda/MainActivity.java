@@ -869,6 +869,9 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private void writeJsonFile2(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d, float[] projectionMatrix, float[] viewMatrix) {
     JSONObject jObj = new JSONObject();
     try {
+      long timestamp = System.nanoTime();
+      jObj.put("timestamp", timestamp);
+
       jObj.put("fileDepth", depthFileName);
       jObj.put("imageFileName", imageFileName);
       jObj.put("scale_factor", scale_factor);
