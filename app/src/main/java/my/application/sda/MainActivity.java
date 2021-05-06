@@ -916,6 +916,9 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private void writeCameraParametersJSON(String filename, FrameContainer frameContainer){
     JSONObject jObj = new JSONObject();
     try{
+      long timestamp = System.nanoTime();
+      jObj.put("timestamp", timestamp);
+
       JSONArray projectionMatrix = new JSONArray(frameContainer.getProjectionMatrix());
       jObj.put("projectionMatrix", projectionMatrix);
 
