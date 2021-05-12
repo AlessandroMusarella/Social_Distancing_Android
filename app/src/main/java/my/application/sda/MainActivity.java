@@ -71,6 +71,7 @@ import my.application.sda.calibrator.Point;
 import my.application.sda.detector.Detector;
 import my.application.sda.detector.DistanceTracker;
 import my.application.sda.detector.PersonDetection;
+import my.application.sda.helpers.CoordsUtils;
 import my.application.sda.helpers.ImageUtil;
 import my.application.sda.helpers.ImageUtilsKt;
 import my.application.sda.helpers.Logger;
@@ -674,7 +675,6 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
         // save pointCloud
         //writePointCloudJSON(recordingPath+"/pointCloud"+frameCounter+".json", frameContainer.getPointCloud());
 
-        frameCounter++;
       }
 
       imageFrame.close();
@@ -719,6 +719,12 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
         lastPointCloudTimestamp = pointCloud.getTimestamp();
         currentPointCloud = Point.parsePointCloud(pointCloud);
         frameContainer.setPointCloud(currentPointCloud);
+
+        // save pointCloud
+        if(isRecording) {
+          writePointCloudJSON(recordingPath + "/pointCloud" + frameCounter + ".json", currentPointCloud, frameContainer);
+          frameCounter++;
+        }
       }
       Matrix.multiplyMM(modelViewProjectionMatrix, 0, projectionMatrix, 0, viewMatrix, 0);
       pointCloudShader.setMat4("u_ModelViewProjection", modelViewProjectionMatrix);
@@ -789,7 +795,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
             frameContainer.getCy_d());
      */
 
-    writeJsonFile2(distanceTracker,
+    writeJsonFile(distanceTracker,
             depthFileName,
             imageFileName,
             JSONFileName,
@@ -828,45 +834,7 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     startActivityForResult(settingIntent, 0);
   }
 
-  private void writeJsonFile1(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d) {
-    JSONObject sampleObject = new JSONObject();
-    try {
-      sampleObject.put("fileDepth", depthFileName);
-      sampleObject.put("imageFileName", imageFileName);
-      sampleObject.put("scale_factor", scale_factor);
-      sampleObject.put("shift_factor", shift_factor);
-      sampleObject.put("fx_d", fx_d);
-      sampleObject.put("fy_d", fy_d);
-      sampleObject.put("cx_d", cx_d);
-      sampleObject.put("cy_d", cy_d);
-
-      List<Map> finalMap = new ArrayList<>();
-      List<String> colored_shapes = distanceTracker.getColored_shapes();
-      int cont_pers = 0;
-      for (Detector.Recognition r : mappedRecognitions){
-        Map<String, String> recognitions = new HashMap<>();
-        recognitions.put("rectf_bottom", r.getLocation().bottom + "");
-        recognitions.put("rectf_top", r.getLocation().top + "");
-        recognitions.put("rectf_left", r.getLocation().left + "");
-        recognitions.put("rectf_right", r.getLocation().right + "");
-        recognitions.put("color", colored_shapes.get(cont_pers++));
-        finalMap.add(recognitions);
-      }
-      sampleObject.put("detections", new ObjectMapper().writeValueAsString(finalMap));
-
-      FileOutputStream fos = this.getApplicationContext().openFileOutput(filename, Context.MODE_PRIVATE);
-      String finalMessage = sampleObject.toString(2);
-      fos.write(finalMessage.getBytes());
-      fos.flush();
-      fos.close();
-    } catch (JSONException | FileNotFoundException e) {
-      e.printStackTrace();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-  }
-
-  private void writeJsonFile2(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d, float[] projectionMatrix, float[] viewMatrix) {
+  private void writeJsonFile(DistanceTracker distanceTracker, String depthFileName, String imageFileName, String filename, List<Detector.Recognition> mappedRecognitions, float scale_factor, float shift_factor, float fx_d, float fy_d, float cx_d, float cy_d, float[] projectionMatrix, float[] viewMatrix) {
     JSONObject jObj = new JSONObject();
     try {
       long timestamp = System.nanoTime();
@@ -919,6 +887,11 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
       long timestamp = System.nanoTime();
       jObj.put("timestamp", timestamp);
 
+      float[] cameraTranslationMatrix = new float[16];
+      frameContainer.getCameraPose().toMatrix(cameraTranslationMatrix, 0);
+      JSONArray cameraPose = new JSONArray(cameraTranslationMatrix);
+      jObj.put("cameraPose", cameraPose);
+
       JSONArray projectionMatrix = new JSONArray(frameContainer.getProjectionMatrix());
       jObj.put("projectionMatrix", projectionMatrix);
 
@@ -942,18 +915,34 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
     }
   }
 
-  private void writePointCloudJSON(String filename, Point[] points){
+  private void writePointCloudJSON(String filename, Point[] points, FrameContainer frameContainer){
     JSONObject jObj = new JSONObject();
     try{
-      JSONArray jPointCloud = new JSONArray();
+      JSONArray j3D = new JSONArray();
+      JSONArray j2D = new JSONArray();
       if(points != null) {
         for (Point point : points) {
-          JSONArray jPoint = new JSONArray(new float[]{point.getX(), point.getY(), point.getZ()});
-          jPointCloud.put(jPoint);
+
+          android.graphics.Point screenPoint = CoordsUtils.worldToScreen(new float[]{point.getX(), point.getY(), point.getZ()},
+                  frameContainer.getImage().getWidth(),
+                  frameContainer.getImage().getHeight(),
+                  frameContainer.getProjectionMatrix(),
+                  frameContainer.getViewMatrix());
+
+          // Clipping point outside screen
+          if(screenPoint.x >= frameContainer.getImage().getWidth() || screenPoint.y >= frameContainer.getImage().getHeight() || screenPoint.x < 0 || screenPoint.y < 0) {
+            continue;
+          }
+
+          JSONArray coords3D = new JSONArray(new float[]{point.getX(), point.getY(), point.getZ()});
+          j3D.put(coords3D);
+          JSONArray coords2D = new JSONArray(new float[]{screenPoint.x, screenPoint.y});
+          j2D.put(coords2D);
         }
       }
 
-      jObj.put("pointCloud", jPointCloud);
+      jObj.put("3d_coords", j3D);
+      jObj.put("2d_coords", j2D);
 
       FileOutputStream fos = new FileOutputStream(filename);
       String finalMessage = jObj.toString(5);
