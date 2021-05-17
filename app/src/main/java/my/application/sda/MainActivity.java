@@ -16,6 +16,7 @@
 
 package my.application.sda;
 
+import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
@@ -78,7 +79,7 @@ import java.util.Date;
  * ARCore API. The application will display any detected planes and will allow the user to tap on a
  * plane to place a 3D model.
  */
-public class MainActivity extends AppCompatActivity implements SampleRender.Renderer {
+public class MainActivity extends Activity implements SampleRender.Renderer {
 
   private static final String TAG = MainActivity.class.getSimpleName();
 
@@ -496,6 +497,14 @@ public class MainActivity extends AppCompatActivity implements SampleRender.Rend
   private void writeCameraParametersJSON(String filename, FrameContainer frameContainer){
     JSONObject jObj = new JSONObject();
     try{
+      long timestamp = System.nanoTime();
+      jObj.put("timestamp", timestamp);
+
+      float[] cameraTranslationMatrix = new float[16];
+      frameContainer.getCameraPose().toMatrix(cameraTranslationMatrix, 0);
+      JSONArray cameraPose = new JSONArray(cameraTranslationMatrix);
+      jObj.put("cameraPose", cameraPose);
+
       JSONArray projectionMatrix = new JSONArray(frameContainer.getProjectionMatrix());
       jObj.put("projectionMatrix", projectionMatrix);
 
