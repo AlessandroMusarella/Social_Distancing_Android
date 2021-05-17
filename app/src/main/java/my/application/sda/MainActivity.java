@@ -16,6 +16,7 @@
 
 package my.application.sda;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -90,7 +91,7 @@ import java.util.Map;
  * ARCore API. The application will display any detected planes and will allow the user to tap on a
  * plane to place a 3D model.
  */
-public class MainActivity extends AppCompatActivity implements SampleRender.Renderer {
+public class MainActivity extends Activity implements SampleRender.Renderer {
 
   private static final String TAG = MainActivity.class.getSimpleName();
 
